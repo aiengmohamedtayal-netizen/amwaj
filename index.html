@@ -15,6 +15,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+    <link rel="preload" href="assets/fonts/ibm-plex-sans-arabic/IBMPlexSansArabic-Regular.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="assets/fonts/ibm-plex-sans-arabic/IBMPlexSansArabic-SemiBold.woff2" as="font" type="font/woff2" crossorigin>
 
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✈️</text></svg>">
@@ -44,7 +46,7 @@
       "url": "https://www.amwajtravel.com/",
       "telephone": "+20473226111",
       "email": "amwajtravel@hotmail.com",
-      "priceRange": "$$",
+      "priceRange": "Contact for Pricing",
       "address": {
         "@type": "PostalAddress",
         "streetAddress": "Apt 1, Ground Floor, Bldg 30, Al-Kholafaa Al-Rashideen & Abu Bakr Al-Siddiq St, Next to Banque du Caire, Opp. El-Shaab Pharmacy",
@@ -78,9 +80,10 @@
     <!-- Tailwind & FontAwesome CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     
     <!-- Custom Stylesheets -->
+    <link rel="stylesheet" href="css/fonts.css">
     <link rel="stylesheet" href="css/design-tokens.css">
     <link rel="stylesheet" href="css/main.css">
     
@@ -90,8 +93,9 @@
             theme: {
                 extend: {
                     fontFamily: {
-                        sans: ['Cairo', '"Plus Jakarta Sans"', 'sans-serif'],
-                        arabic: ['Cairo', 'sans-serif'],
+                        sans: ['"IBM Plex Sans Arabic"', '"Plus Jakarta Sans"', 'sans-serif'],
+                        arabic: ['"IBM Plex Sans Arabic"', 'sans-serif'],
+                        english: ['"Plus Jakarta Sans"', 'sans-serif'],
                     },
                     colors: {
                         brand: {
@@ -124,6 +128,8 @@
     </script>
 </head>
 <body class="bg-slate-50 dark:bg-brand-900 text-slate-800 dark:text-slate-100 font-sans transition-colors duration-300 min-h-screen selection:bg-brand-500 selection:text-white">
+    <!-- Top Scroll Progress Bar -->
+    <div id="scrollProgressBar" class="scroll-progress-bar"></div>
 
     <!-- Accessible Skip to Content Link -->
     <a href="#main-content" class="skip-link"><span class="lang-ar">الانتقال إلى المحتوى الرئيسي</span><span class="lang-en">Skip to main content</span></a>
@@ -276,6 +282,7 @@
                                 <div class="relative h-72 overflow-hidden bg-slate-900 hero-media-wrapper">
                                     <!-- High Quality Kaaba / Holy Sanctuary Visual -->
                                     <img src="assets/hero.png" 
+                                         fetchpriority="high" decoding="async"
                                          onerror="this.src='https://images.unsplash.com/photo-1565552070098-fd83a8dd7136?auto=format&fit=crop&w=1000&q=80'"
                                          alt="الكعبة المشرفة - برامج الحج والعمرة 5 نجوم - شركة أمواج للسياحة" 
                                          width="1000" height="600"
@@ -590,8 +597,8 @@
 
                         <div class="p-6 pt-4 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between gap-3 bg-slate-50/50 dark:bg-brand-950/40">
                             <div class="flex flex-col">
-                                <span class="text-[10px] text-slate-400 font-bold uppercase"><span class="lang-en">From</span><span class="lang-ar">يبدأ من</span></span>
-                                <span class="text-lg font-black text-brand-500 dark:text-brand-400">EGP 4,500</span>
+                                <span class="text-[10px] text-slate-400 font-bold uppercase"><span class="lang-en">Pricing</span><span class="lang-ar">الأسعار</span></span>
+                                <span class="text-xs font-extrabold text-brand-600 dark:text-tealCustom-400 flex items-center gap-1 mt-0.5"><i class="fa-solid fa-tag text-goldAccent-500"></i> <span class="lang-en">Contact for Quote</span><span class="lang-ar">تواصل لمعرفة السعر</span></span>
                             </div>
                             <button onclick="openBookingModal('Egypt Domestic Tours')" class="px-5 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-xs font-extrabold shadow-md shadow-brand-500/20 transition-all flex items-center gap-1.5 shrink-0 btn-magnetic">
                                 <i class="fa-solid fa-paper-plane text-xs"></i>
@@ -637,8 +644,8 @@
 
                         <div class="p-6 pt-4 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between gap-3 bg-slate-50/50 dark:bg-brand-950/40">
                             <div class="flex flex-col">
-                                <span class="text-[10px] text-slate-400 font-bold uppercase"><span class="lang-en">From</span><span class="lang-ar">يبدأ من</span></span>
-                                <span class="text-lg font-black text-brand-500 dark:text-brand-400">$690 USD</span>
+                                <span class="text-[10px] text-slate-400 font-bold uppercase"><span class="lang-en">Pricing</span><span class="lang-ar">الأسعار</span></span>
+                                <span class="text-xs font-extrabold text-brand-600 dark:text-tealCustom-400 flex items-center gap-1 mt-0.5"><i class="fa-solid fa-tag text-goldAccent-500"></i> <span class="lang-en">Contact for Quote</span><span class="lang-ar">تواصل لمعرفة السعر</span></span>
                             </div>
                             <button onclick="openBookingModal('Turkey Holiday Package')" class="px-5 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-xs font-extrabold shadow-md shadow-brand-500/20 transition-all flex items-center gap-1.5 shrink-0 btn-magnetic">
                                 <i class="fa-solid fa-paper-plane text-xs"></i>
@@ -683,8 +690,8 @@
 
                         <div class="p-6 pt-4 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between gap-3 bg-slate-50/50 dark:bg-brand-950/40">
                             <div class="flex flex-col">
-                                <span class="text-[10px] text-slate-400 font-bold uppercase"><span class="lang-en">From</span><span class="lang-ar">يبدأ من</span></span>
-                                <span class="text-lg font-black text-brand-500 dark:text-brand-400">EGP 28,000</span>
+                                <span class="text-[10px] text-slate-400 font-bold uppercase"><span class="lang-en">Pricing</span><span class="lang-ar">الأسعار</span></span>
+                                <span class="text-xs font-extrabold text-brand-600 dark:text-tealCustom-400 flex items-center gap-1 mt-0.5"><i class="fa-solid fa-tag text-goldAccent-500"></i> <span class="lang-en">Contact for Quote</span><span class="lang-ar">تواصل لمعرفة السعر</span></span>
                             </div>
                             <button onclick="openBookingModal('VIP Umrah Package')" class="px-5 py-2.5 rounded-xl bg-goldAccent-500 hover:bg-goldAccent-600 text-brand-900 font-extrabold text-xs shadow-md transition-all flex items-center gap-1.5 shrink-0 btn-magnetic">
                                 <i class="fa-solid fa-kaaba text-xs"></i>
@@ -748,8 +755,8 @@
 
                         <div class="p-6 pt-4 border-t border-slate-200 dark:border-slate-800/80 mt-auto flex items-center justify-between gap-3">
                             <div class="flex flex-col">
-                                <span class="text-[10px] text-slate-400 font-bold uppercase"><span class="lang-en">From</span><span class="lang-ar">يبدأ من</span></span>
-                                <span class="text-lg font-black text-brand-500 dark:text-brand-400">$1,250 USD</span>
+                                <span class="text-[10px] text-slate-400 font-bold uppercase"><span class="lang-en">Pricing</span><span class="lang-ar">الأسعار</span></span>
+                                <span class="text-xs font-extrabold text-brand-600 dark:text-tealCustom-400 flex items-center gap-1 mt-0.5"><i class="fa-solid fa-tag text-goldAccent-500"></i> <span class="lang-en">Contact for Quote</span><span class="lang-ar">تواصل لمعرفة السعر</span></span>
                             </div>
                             <button onclick="openBookingModal('Luxury VIP Experience')" class="px-5 py-2.5 rounded-xl bg-goldAccent-500 hover:bg-goldAccent-600 text-brand-900 font-extrabold text-xs shadow-md transition-all flex items-center gap-1.5 shrink-0 btn-magnetic">
                                 <i class="fa-solid fa-crown text-xs"></i>
@@ -795,8 +802,8 @@
 
                         <div class="p-6 pt-4 border-t border-slate-200 dark:border-slate-800/80 mt-auto flex items-center justify-between gap-3">
                             <div class="flex flex-col">
-                                <span class="text-[10px] text-slate-400 font-bold uppercase"><span class="lang-en">From</span><span class="lang-ar">يبدأ من</span></span>
-                                <span class="text-lg font-black text-brand-500 dark:text-brand-400">EGP 6,900</span>
+                                <span class="text-[10px] text-slate-400 font-bold uppercase"><span class="lang-en">Pricing</span><span class="lang-ar">الأسعار</span></span>
+                                <span class="text-xs font-extrabold text-brand-600 dark:text-tealCustom-400 flex items-center gap-1 mt-0.5"><i class="fa-solid fa-tag text-goldAccent-500"></i> <span class="lang-en">Contact for Quote</span><span class="lang-ar">تواصل لمعرفة السعر</span></span>
                             </div>
                             <button onclick="openBookingModal('Family Holiday Package')" class="px-5 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-extrabold text-xs shadow-md shadow-brand-500/20 transition-all flex items-center gap-1.5 shrink-0 btn-magnetic">
                                 <i class="fa-solid fa-people-group text-xs"></i>
@@ -842,8 +849,8 @@
 
                         <div class="p-6 pt-4 border-t border-slate-200 dark:border-slate-800/80 mt-auto flex items-center justify-between gap-3">
                             <div class="flex flex-col">
-                                <span class="text-[10px] text-slate-400 font-bold uppercase"><span class="lang-en">From</span><span class="lang-ar">يبدأ من</span></span>
-                                <span class="text-lg font-black text-brand-500 dark:text-brand-400">$1,800 USD</span>
+                                <span class="text-[10px] text-slate-400 font-bold uppercase"><span class="lang-en">Pricing</span><span class="lang-ar">الأسعار</span></span>
+                                <span class="text-xs font-extrabold text-brand-600 dark:text-tealCustom-400 flex items-center gap-1 mt-0.5"><i class="fa-solid fa-tag text-goldAccent-500"></i> <span class="lang-en">Contact for Quote</span><span class="lang-ar">تواصل لمعرفة السعر</span></span>
                             </div>
                             <button onclick="openBookingModal('Honeymoon Package')" class="px-5 py-2.5 rounded-xl bg-tealCustom-500 hover:bg-tealCustom-600 text-white font-extrabold text-xs shadow-md transition-all flex items-center gap-1.5 shrink-0 btn-magnetic">
                                 <i class="fa-solid fa-heart text-xs"></i>
@@ -1127,11 +1134,20 @@
                         <h3 class="text-xl font-bold text-slate-900 dark:text-white mb-6 lang-ar">إرسال طلب استفسار عن رحلة</h3>
                         
                         <form id="contactForm" onsubmit="handleContactSubmit(event)" class="space-y-4">
+                            <!-- Honeypot Anti-Spam Field -->
+                            <input type="text" name="website_hp" class="hidden" tabindex="-1" autocomplete="off" aria-hidden="true">
+
+                            <div>
+                                <label for="contactNameInput" class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 lang-en">Full Name</label>
+                                <label for="contactNameInput" class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 lang-ar">الاسم بالكامل</label>
+                                <input type="text" id="contactNameInput" name="name" required placeholder="محمد أحمد" class="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-brand-900 text-slate-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-brand-500">
+                            </div>
+
                             <div class="grid sm:grid-cols-2 gap-4">
                                 <div>
                                     <label for="contactDestSelect" class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 lang-en">Destination</label>
                                     <label for="contactDestSelect" class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 lang-ar">الوجهة السياحية</label>
-                                    <select id="contactDestSelect" class="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-brand-900 text-slate-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-brand-500">
+                                    <select id="contactDestSelect" name="destination" class="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-brand-900 text-slate-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-brand-500">
                                         <option>Turkey (Istanbul & Cappadocia)</option>
                                         <option>Saudi Arabia (VIP Hajj & Umrah Package)</option>
                                         <option>Egypt (Sharm / Hurghada / Nile Cruise)</option>
@@ -1143,7 +1159,7 @@
                                 <div>
                                     <label for="contactDateInput" class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 lang-en">Travel Date</label>
                                     <label for="contactDateInput" class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 lang-ar">تاريخ السفر</label>
-                                    <input type="date" id="contactDateInput" required class="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-brand-900 text-slate-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-brand-500">
+                                    <input type="date" id="contactDateInput" name="date" required class="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-brand-900 text-slate-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-brand-500">
                                 </div>
                             </div>
 
@@ -1151,19 +1167,19 @@
                                 <div>
                                     <label for="contactPhoneInput" class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 lang-en">Phone / WhatsApp</label>
                                     <label for="contactPhoneInput" class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 lang-ar">الهاتف / الواتساب</label>
-                                    <input type="tel" id="contactPhoneInput" required placeholder="01070553080" class="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-brand-900 text-slate-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-brand-500">
+                                    <input type="tel" id="contactPhoneInput" name="phone" required placeholder="01070553080" class="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-brand-900 text-slate-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-brand-500">
                                 </div>
                                 <div>
-                                    <label for="contactEmailInput" class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 lang-en">Email Address</label>
-                                    <label for="contactEmailInput" class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 lang-ar">البريد الإلكتروني</label>
-                                    <input type="email" id="contactEmailInput" required placeholder="amwajtravel@hotmail.com" class="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-brand-900 text-slate-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-brand-500">
+                                    <label for="contactEmailInput" class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 lang-en">Email Address (Optional)</label>
+                                    <label for="contactEmailInput" class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 lang-ar">البريد الإلكتروني (اختياري)</label>
+                                    <input type="email" id="contactEmailInput" name="email" placeholder="amwajtravel@hotmail.com" class="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-brand-900 text-slate-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-brand-500">
                                 </div>
                             </div>
 
                             <div>
-                                <label for="contactNotesInput" class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 lang-en">Special Requests</label>
-                                <label for="contactNotesInput" class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 lang-ar">طلبات خاصة</label>
-                                <textarea id="contactNotesInput" rows="3" placeholder="تفاصيل الرحلة، الفنادق المفضلة..." class="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-brand-900 text-slate-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-brand-500"></textarea>
+                                <label for="contactNotesInput" class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 lang-en">Special Requests / Travel Details</label>
+                                <label for="contactNotesInput" class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 lang-ar">طلبات خاصة / تفاصيل الرحلة</label>
+                                <textarea id="contactNotesInput" name="notes" rows="3" placeholder="تفاصيل الرحلة، الفنادق المفضلة..." class="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-brand-900 text-slate-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-brand-500"></textarea>
                             </div>
 
                             <button type="submit" class="w-full py-3.5 rounded-xl bg-gradient-to-r from-brand-500 to-tealCustom-500 hover:from-brand-600 hover:to-tealCustom-600 text-white font-bold text-xs shadow-lg btn-magnetic">
@@ -1266,10 +1282,11 @@
                 <div>
                     <h4 class="text-xs font-bold leading-none lang-en">Amwaj AI Travel Concierge</h4>
                     <h4 class="text-xs font-bold leading-none lang-ar">مساعد أمواج الذكي للسياحة</h4>
-                    <span class="text-[10px] text-brand-200">Gemini 3 Flash</span>
                 </div>
             </div>
-            <button onclick="toggleAiDrawer()" class="text-slate-300 hover:text-white text-sm p-1" aria-label="Close AI Drawer"><i class="fa-solid fa-xmark"></i></button>
+            <div class="flex items-center gap-2">
+                <button onclick="toggleAiDrawer()" class="text-slate-300 hover:text-white text-sm p-1" aria-label="Close AI Drawer"><i class="fa-solid fa-xmark"></i></button>
+            </div>
         </div>
 
         <div class="px-4 py-2 bg-slate-100 dark:bg-brand-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs">

@@ -1,7 +1,7 @@
 /**
  * Amwaj AI Agent Engine
- * Integrated RAG, Intent Classification, Tool Execution, SSE Streaming & Groq API
- * Compatible with file:// local execution and standard web servers.
+ * Production Architecture: Server-side API Proxy (/api/chat), Tool Execution & Business Continuation
+ * Official Category A License No. 1766 | Kafr El Sheikh, Egypt
  */
 
 (function () {
@@ -25,7 +25,7 @@
                 type: "عمرة",
                 title: "عمرة VIP - 5 نجوم",
                 duration: "10 أيام",
-                price: "ابتداءً من 45,000 جنيه مصري",
+                price: "تواصل لمعرفة التفاصيل والأسعار",
                 hotels: ["فندق سويس أوتيل المقام (مكة)", "فندق دار التقوى (المدينة)"],
                 includes: ["طيران مباشر", "إفطار", "تنقلات بقطار الحرمين", "فيزا"]
             },
@@ -35,7 +35,7 @@
                 type: "سياحة خارجية",
                 title: "رحلة إسطنبول الساحرة",
                 duration: "7 أيام / 6 ليالي",
-                price: "ابتداءً من 690 دولار",
+                price: "تواصل لمعرفة التفاصيل والأسعار",
                 hotels: ["فندق 4 نجوم بساحة تقسيم"],
                 includes: ["طيران", "إفطار", "جولة مضيق البوسفور", "رحلة جزر الأميرات"]
             },
@@ -45,143 +45,82 @@
                 type: "شهر عسل",
                 title: "عروض المالديف لشهر العسل",
                 duration: "5 أيام / 4 ليالي",
-                price: "يحدد حسب المنتجع",
+                price: "تواصل لمعرفة التفاصيل والأسعار",
                 hotels: ["خيارات متعددة من منتجعات 5 نجوم مع فيلا فوق الماء"],
                 includes: ["طيران", "إقامة شاملة All Inclusive", "تنقل بالطائرة المائية"]
-            }
-        ],
-        faq: [
-            {
-                question: "ما هي الأوراق المطلوبة لفيزا الشنغن؟",
-                answer: "جواز سفر ساري، كشف حساب بنكي لآخر 6 أشهر، شهادة تحركات، تأمين طبي، وحجوزات فندقية وطيران (نقوم بتجهيزها في أمواج)."
-            },
-            {
-                question: "هل يوجد تقسيط للرحلات؟",
-                answer: "نعم، نقدم أنظمة تقسيط متعددة لرحلات العمرة والسياحة عبر كروت الائتمان لعدة بنوك مصرية."
             }
         ]
     };
 
-    // Attempt dynamic fetch if served over HTTP/S
-    if (window.location.protocol.startsWith('http')) {
-        fetch('data/knowledge-base.json')
-            .then(res => res.json())
-            .then(data => {
-                knowledgeBase = data;
-                console.log("Amwaj AI: Dynamic Knowledge Base Loaded.");
-            })
-            .catch(err => console.log("Amwaj AI: Using built-in Knowledge Base."));
-    }
-
-    // Global conversation state
-    window.aiConversationHistory = [];
-
-    // 2. Intent Classifier & History Truncator
-    function optimizeHistory(history, maxMessages = 10) {
-        if (history.length > maxMessages) {
-            return history.slice(history.length - maxMessages);
-        }
-        return history;
-    }
-
-    function detectIntent(message) {
-        const q = message.toLowerCase();
-        let intent = "general";
-        if (q.includes("باقة") || q.includes("عرض") || q.includes("رحلة") || q.includes("سعر") || q.includes("عمرة") || q.includes("حج")) {
-            intent = "searchPackages";
-        } else if (q.includes("فيزا") || q.includes("تقسيط") || q.includes("ورق") || q.includes("مطلوب")) {
-            intent = "searchFAQ";
-        } else if (q.includes("مكان") || q.includes("عنوان") || q.includes("تليفون") || q.includes("واتس") || q.includes("تواصل")) {
-            intent = "getCompanyInfo";
-        }
-        console.log("Amwaj AI Intent:", intent);
-        return intent;
-    }
-
-    // 3. Tools Definitions & Execution Layer
+    // 2. Tools Schema
     const groqTools = [
         {
             type: "function",
             function: {
                 name: "searchPackages",
-                description: "Search for available travel packages by destination (e.g. Turkey, Umrah, Maldives).",
+                description: "البحث في برامج ورحلات شركة أمواج للسياحة المتاحة",
                 parameters: {
                     type: "object",
                     properties: {
-                        destination: { type: "string" }
-                    },
-                    required: ["destination"]
+                        destination: { type: "string", description: "الوجهة مثل تركيا، السعودية، المالديف" },
+                        type: { type: "string", description: "نوع الرحلة مثل عمرة، سياحة خارجية، شهر عسل" }
+                    }
                 }
             }
         },
         {
             type: "function",
             function: {
-                name: "searchFAQ",
-                description: "Get answers to frequently asked questions about visas, installments, and general travel.",
-                parameters: {
-                    type: "object",
-                    properties: {
-                        query: { type: "string" }
-                    },
-                    required: ["query"]
-                }
-            }
-        },
-        {
-            type: "function",
-            function: {
-                name: "getCompanyInfo",
-                description: "Get Amwaj Travel contact information, license, and office location.",
+                name: "getCompanyContact",
+                description: "الحصول على بيانات الاتصال الرسمية لشركة أمواج للسياحة بكفر الشيخ",
                 parameters: { type: "object", properties: {} }
             }
         }
     ];
 
-    function executeTool(toolName, args) {
-        console.log("Executing Tool:", toolName, args);
-        if (toolName === "searchPackages") {
+    // 3. Tool Implementations
+    function executeTool(name, args) {
+        if (name === "searchPackages") {
             const dest = (args.destination || "").toLowerCase();
-            const results = knowledgeBase.packages.filter(p => 
-                p.destination.toLowerCase().includes(dest) || 
-                p.title.toLowerCase().includes(dest) || 
-                p.type.toLowerCase().includes(dest) ||
-                dest === ""
-            );
-            return JSON.stringify(results.length > 0 ? results : knowledgeBase.packages);
+            const type = (args.type || "").toLowerCase();
+            let results = knowledgeBase.packages.filter(p => {
+                const mDest = !dest || p.destination.toLowerCase().includes(dest);
+                const mType = !type || p.type.toLowerCase().includes(type);
+                return mDest && mType;
+            });
+            if (results.length === 0) results = knowledgeBase.packages;
+            return JSON.stringify(results, null, 2);
+        } else if (name === "getCompanyContact") {
+            return JSON.stringify(knowledgeBase.company_info, null, 2);
         }
-        if (toolName === "searchFAQ") {
-            return JSON.stringify(knowledgeBase.faq);
-        }
-        if (toolName === "getCompanyInfo") {
-            return JSON.stringify(knowledgeBase.company_info);
-        }
-        return JSON.stringify({ status: "ok" });
+        return JSON.stringify({ error: "أداة غير معروفة" });
     }
 
-    // 4. OpenAI-Compatible API Client (TokenRouter Primary -> Groq Fallback)
-    async function executeProviderStream(url, key, model, messages, tools, onChunk) {
+    // 4. Memory Optimization
+    window.aiConversationHistory = window.aiConversationHistory || [];
+    function optimizeHistory(history, maxMessages = 8) {
+        if (history.length <= maxMessages) return history;
+        return history.slice(-maxMessages);
+    }
+
+    // 5. Serverless Proxy Endpoint Stream Caller (/api/chat)
+    async function executeServerlessStream(endpointUrl, messages, tools, onChunk) {
         const payload = {
-            model: model,
             messages: messages,
-            temperature: 0.7,
+            tools: tools,
             stream: true
         };
-        if (tools && tools.length > 0) {
-            payload.tools = tools;
-        }
 
-        const res = await fetch(url, {
+        const res = await fetch(endpointUrl, {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${key}`
-            },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload)
         });
 
         if (!res.ok) {
-            throw new Error(`API Error ${res.status} from ${url}`);
+            let errorText = "";
+            try { errorText = await res.text(); } catch (e) {}
+            throw new Error(`Server API Error ${res.status}: ${errorText}`);
         }
 
         const reader = res.body.getReader();
@@ -221,7 +160,7 @@
                             }
                         }
                     } catch (e) {
-                        // Partial JSON chunk ignored
+                        // Ignore partial JSON chunk
                     }
                 }
             }
@@ -234,49 +173,20 @@
         return { type: "text", text: fullText };
     }
 
-    async function callGroqAPI(messages, tools, onChunk) {
+    async function callAiEndpoint(messages, tools, onChunk) {
         const aiConfig = (window.AMWAJ_CONFIG && window.AMWAJ_CONFIG.ai) ? window.AMWAJ_CONFIG.ai : {};
-        const primary = aiConfig.primary || {
-            url: "https://api.tokenrouter.com/v1/chat/completions",
-            key: window.TOKENROUTER_API_KEY || "YOUR_TOKENROUTER_API_KEY",
-            model: "moonshotai/kimi-k3-free"
-        };
-        const fallback = aiConfig.fallback || {
-            url: "https://api.groq.com/openai/v1/chat/completions",
-            key: window.GROQ_API_KEY || "YOUR_GROQ_API_KEY",
-            model: "llama-3.3-70b-versatile",
-            fallbackModel: "llama-3.1-8b-instant"
-        };
-
-        // Try 1: TokenRouter Primary
-        try {
-            console.log("Amwaj AI: Calling Primary Provider TokenRouter (moonshotai/kimi-k3-free)...");
-            return await executeProviderStream(primary.url, primary.key, primary.model, messages, tools, onChunk);
-        } catch (err1) {
-            console.warn("TokenRouter Primary failed, switching to Fallback Groq 70B:", err1);
-        }
-
-        // Try 2: Groq 70B Fallback
-        try {
-            console.log("Amwaj AI: Calling Fallback Groq (llama-3.3-70b-versatile)...");
-            return await executeProviderStream(fallback.url, fallback.key, fallback.model, messages, tools, onChunk);
-        } catch (err2) {
-            console.warn("Groq 70B failed, switching to Groq 8B:", err2);
-        }
-
-        // Try 3: Groq 8B Fallback
-        console.log("Amwaj AI: Calling Fallback Groq 8B (llama-3.1-8b-instant)...");
-        return await executeProviderStream(fallback.url, fallback.key, fallback.fallbackModel || "llama-3.1-8b-instant", messages, tools, onChunk);
+        const apiEndpoint = aiConfig.apiEndpoint || "/api/chat";
+        return await executeServerlessStream(apiEndpoint, messages, tools, onChunk);
     }
 
-    // 5. UI Controller & Handlers
-    const systemPrompt = `ROLE: You are "Amwaj AI", the senior travel consultant for Amwaj Travel & Tourism (كفر الشيخ، مصر - ترخيص 1766).
+    // 6. UI Controller & Handlers
+    const systemPrompt = `ROLE: You are "مساعد أمواج الذكي", the senior AI travel concierge for Amwaj Travel & Tourism (كفر الشيخ، مصر - ترخيص 1766).
 RULES:
 - Always be helpful, polite, professional, and natural in Arabic.
 - Ask one clarifying question at a time.
 - If you need package details or company info, USE THE TOOLS provided.
 - NEVER invent prices or fake packages.
-- Keep responses concise and engaging.`;
+- Always identify yourself ONLY as "مساعد أمواج الذكي". Never mention internal AI provider brand names.`;
 
     window.toggleAiDrawer = function () {
         const drawer = document.getElementById('aiDrawer');
@@ -292,6 +202,27 @@ RULES:
             window.handleAiChatSubmit(new Event('submit'));
         }
     };
+
+    function renderBusinessContinuationHtml() {
+        return `
+            <div class="space-y-3 p-3 bg-amber-50 dark:bg-slate-800/80 rounded-xl border border-amber-200 dark:border-amber-900/40 text-xs text-slate-800 dark:text-slate-200">
+                <p class="font-bold text-amber-900 dark:text-amber-300">
+                    <i class="fa-solid fa-circle-info ml-1"></i> الخدمة التفاعلية غير متاحة حالياً. يسعدنا مساعدتك فوراً عبر قنوات التواصل المباشرة:
+                </p>
+                <div class="flex flex-wrap gap-2 pt-1">
+                    <a href="https://wa.me/201070553080" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-bold hover:bg-emerald-700 transition-colors shadow-sm">
+                        <i class="fa-brands fa-whatsapp"></i> تواصل عبر الواتساب
+                    </a>
+                    <a href="tel:01070553080" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-500 text-white font-bold hover:bg-brand-600 transition-colors shadow-sm">
+                        <i class="fa-solid fa-phone"></i> اتصل بنا الآن
+                    </a>
+                    <button onclick="openBookingModal()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-700 text-white font-bold hover:bg-slate-800 transition-colors shadow-sm">
+                        <i class="fa-solid fa-calendar-check"></i> تقديم طلب حجز
+                    </button>
+                </div>
+            </div>
+        `;
+    }
 
     window.handleAiChatSubmit = async function (e) {
         if (e && e.preventDefault) e.preventDefault();
@@ -330,12 +261,12 @@ RULES:
                 ...window.aiConversationHistory
             ];
 
-            let result = await callGroqAPI(messages, groqTools, (chunkText) => {
+            let result = await callAiEndpoint(messages, groqTools, (chunkText) => {
                 botContent.innerHTML = formatMarkdown(chunkText);
                 chatContainer.scrollTop = chatContainer.scrollHeight;
             });
 
-            // Handle Tool Call if requested by Groq
+            // Handle Tool Call
             if (result.type === "tool_call") {
                 const toolCall = result.tool;
                 const fnName = toolCall.function.name;
@@ -346,18 +277,10 @@ RULES:
 
                 const toolOutput = executeTool(fnName, fnArgs);
 
-                messages.push({
-                    role: "assistant",
-                    tool_calls: [toolCall]
-                });
-                messages.push({
-                    role: "tool",
-                    tool_call_id: toolCall.id || "call_1",
-                    name: fnName,
-                    content: toolOutput
-                });
+                messages.push({ role: "assistant", tool_calls: [toolCall] });
+                messages.push({ role: "tool", tool_call_id: toolCall.id || "call_1", name: fnName, content: toolOutput });
 
-                result = await callGroqAPI(messages, null, (chunkText) => {
+                result = await callAiEndpoint(messages, null, (chunkText) => {
                     botContent.innerHTML = formatMarkdown(chunkText);
                     chatContainer.scrollTop = chatContainer.scrollHeight;
                 });
@@ -366,17 +289,15 @@ RULES:
             window.aiConversationHistory.push({ role: "assistant", content: result.text || "" });
 
         } catch (err) {
-            console.error("AI Error:", err);
-            botContent.innerHTML = isArabic 
-                ? "أهلاً بك! يمكنك التواصل مع شركة أمواج للسياحة عبر الواتساب المباشر: 01070553080 للحصول على الخدمة الفورية."
-                : "Welcome! You can contact Amwaj Travel directly via WhatsApp: +201070553080.";
+            console.error("AI Assistant Error:", err);
+            botContent.innerHTML = renderBusinessContinuationHtml();
         } finally {
             if (sendBtn) sendBtn.disabled = false;
             chatContainer.scrollTop = chatContainer.scrollHeight;
         }
     };
 
-    // AI Itinerary Plan Generator (Connected to Groq AI Agent)
+    // AI Itinerary Plan Generator
     window.generatePreConsultBriefing = async function() {
         const input = document.getElementById('briefingInput');
         const btn = document.getElementById('briefingBtn');
@@ -391,10 +312,10 @@ RULES:
 
         if (btn) btn.disabled = true;
         if (resultContainer) resultContainer.classList.remove('hidden');
-        if (resultContent) resultContent.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles fa-spin text-brand-500"></i> جاري إعداد خطة السفر المخصصة والميزانية بواسطة مساعد أمواج الذكي...';
+        if (resultContent) resultContent.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles fa-spin text-brand-500"></i> جاري إعداد خطة السفر المخصصة بواسطة مساعد أمواج الذكي...';
 
         try {
-            const prompt = `اصنع خطة سفر مخصصة وتفصيلية جداً بناءً على تفاصيل الرحلة التالية: "${text}".
+            const prompt = `اصنع خطة سفر مخصصة وتفصيلية بناءً على تفاصيل الرحلة التالية: "${text}".
 قم بتشمل:
 1. برنامج رحلة مقترح يوم بيوم.
 2. تقديرات الميزانية والنصائح.
@@ -406,7 +327,7 @@ RULES:
                 { role: "user", content: prompt }
             ];
 
-            let result = await callGroqAPI(messages, groqTools, (chunkText) => {
+            let result = await callAiEndpoint(messages, groqTools, (chunkText) => {
                 if (resultContent) resultContent.innerHTML = formatMarkdown(chunkText);
             });
 
@@ -420,13 +341,13 @@ RULES:
                 messages.push({ role: "assistant", tool_calls: [toolCall] });
                 messages.push({ role: "tool", tool_call_id: toolCall.id || "call_1", name: fnName, content: toolOutput });
 
-                await callGroqAPI(messages, null, (chunkText) => {
+                await callAiEndpoint(messages, null, (chunkText) => {
                     if (resultContent) resultContent.innerHTML = formatMarkdown(chunkText);
                 });
             }
         } catch (err) {
             console.error("Briefing Error:", err);
-            if (resultContent) resultContent.innerHTML = "عذراً، حدث خطأ أثناء إعداد خطة السفر. يرجى المحاولة مرة أخرى.";
+            if (resultContent) resultContent.innerHTML = renderBusinessContinuationHtml();
         } finally {
             if (btn) btn.disabled = false;
         }
@@ -434,14 +355,10 @@ RULES:
 
     window.copyBriefingText = function() {
         const resultContent = document.getElementById('briefingContent');
-        if (resultContent) {
-            navigator.clipboard.writeText(resultContent.innerText || resultContent.textContent);
-            alert('تم نسخ خطة السفر بنجاح!');
-        }
+        if (!resultContent) return;
+        navigator.clipboard.writeText(resultContent.innerText || resultContent.textContent);
+        alert('تم نسخ خطة السفر بنجاح!');
     };
-
-    window.generateDestinationImage = async function() {};
-    window.setSamplePrompt = function() {};
 
     function escapeHtml(str) {
         return String(str).replace(/[&<>"']/g, function (m) {

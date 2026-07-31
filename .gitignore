@@ -1,8 +1,17 @@
+# Secrets & Environment Variables
+.env
+.env.*
+*.env
+
+# Agent & Brain Metadata
+.agent/
+.gemini/
+
 # Temporary & OS Files
 .DS_Store
 Thumbs.db
 *.log
 tmp/
+scratch/
 .vscode/
 .idea/
-.agent/

@@ -3,6 +3,7 @@
  * Official Category A License No. 1766 (Kafr El Sheikh, Egypt)
  * Single Source of Truth (SSOT) Architecture
  */
+
 window.AMWAJ_CONFIG = {
     company: {
         nameEn: "Amwaj Travel & Tourism",
@@ -43,18 +44,6 @@ window.AMWAJ_CONFIG = {
         darkBg: "#081826"
     },
     ai: {
-        primary: {
-            name: "TokenRouter",
-            url: "https://api.tokenrouter.com/v1/chat/completions",
-            key: window.TOKENROUTER_API_KEY || "YOUR_TOKENROUTER_API_KEY",
-            model: "moonshotai/kimi-k3-free"
-        },
-        fallback: {
-            name: "Groq",
-            url: "https://api.groq.com/openai/v1/chat/completions",
-            key: window.GROQ_API_KEY || "YOUR_GROQ_API_KEY",
-            model: "llama-3.3-70b-versatile",
-            fallbackModel: "llama-3.1-8b-instant"
-        }
+        apiEndpoint: "/api/chat"
     }
 };

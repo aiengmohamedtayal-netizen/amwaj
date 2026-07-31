@@ -1,0 +1,115 @@
+/* ==========================================================================
+   IBM PLEX SANS ARABIC - WEB FONT DECLARATIONS
+   Self-hosted WOFF2 (primary) and WOFF (fallback)
+   ========================================================================== */
+
+/* Thin (100) */
+@font-face {
+    font-family: 'IBM Plex Sans Arabic';
+    font-style: normal;
+    font-weight: 100;
+    font-display: swap;
+    src: url('../assets/fonts/ibm-plex-sans-arabic/IBMPlexSansArabic-Thin.woff2') format('woff2'),
+         url('../assets/fonts/ibm-plex-sans-arabic/IBMPlexSansArabic-Thin.woff') format('woff');
+}
+
+/* ExtraLight (200) */
+@font-face {
+    font-family: 'IBM Plex Sans Arabic';
+    font-style: normal;
+    font-weight: 200;
+    font-display: swap;
+    src: url('../assets/fonts/ibm-plex-sans-arabic/IBMPlexSansArabic-ExtraLight.woff2') format('woff2'),
+         url('../assets/fonts/ibm-plex-sans-arabic/IBMPlexSansArabic-ExtraLight.woff') format('woff');
+}
+
+/* Light (300) */
+@font-face {
+    font-family: 'IBM Plex Sans Arabic';
+    font-style: normal;
+    font-weight: 300;
+    font-display: swap;
+    src: url('../assets/fonts/ibm-plex-sans-arabic/IBMPlexSansArabic-Light.woff2') format('woff2'),
+         url('../assets/fonts/ibm-plex-sans-arabic/IBMPlexSansArabic-Light.woff') format('woff');
+}
+
+/* Regular (400) */
+@font-face {
+    font-family: 'IBM Plex Sans Arabic';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('../assets/fonts/ibm-plex-sans-arabic/IBMPlexSansArabic-Regular.woff2') format('woff2'),
+         url('../assets/fonts/ibm-plex-sans-arabic/IBMPlexSansArabic-Regular.woff') format('woff');
+}
+
+/* Medium (500) */
+@font-face {
+    font-family: 'IBM Plex Sans Arabic';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url('../assets/fonts/ibm-plex-sans-arabic/IBMPlexSansArabic-Medium.woff2') format('woff2'),
+         url('../assets/fonts/ibm-plex-sans-arabic/IBMPlexSansArabic-Medium.woff') format('woff');
+}
+
+/* SemiBold (600) */
+@font-face {
+    font-family: 'IBM Plex Sans Arabic';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url('../assets/fonts/ibm-plex-sans-arabic/IBMPlexSansArabic-SemiBold.woff2') format('woff2'),
+         url('../assets/fonts/ibm-plex-sans-arabic/IBMPlexSansArabic-SemiBold.woff') format('woff');
+}
+
+/* Bold (700) */
+@font-face {
+    font-family: 'IBM Plex Sans Arabic';
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url('../assets/fonts/ibm-plex-sans-arabic/IBMPlexSansArabic-Bold.woff2') format('woff2'),
+         url('../assets/fonts/ibm-plex-sans-arabic/IBMPlexSansArabic-Bold.woff') format('woff');
+}
+
+/* ==========================================================================
+   ARABIC TYPOGRAPHY SCOPING RULES
+   Apply IBM Plex Sans Arabic to text, body, headings, and UI elements.
+   ========================================================================== */
+
+html[lang="ar"],
+html[lang="ar"] body,
+.rtl {
+    font-family: "IBM Plex Sans Arabic", system-ui, sans-serif;
+}
+
+/* ==========================================================================
+   FONT AWESOME ICON ISOLATION & PROTECTION
+   Prevent Arabic typography rules from overriding icon font-family glyphs
+   ========================================================================== */
+
+.fa,
+.fas,
+.far,
+.fab,
+.fal,
+.fad,
+.fa-solid,
+.fa-regular,
+.fa-light,
+.fa-thin,
+.fa-duotone,
+.fa-brands,
+[class*="fa-"],
+i[class*="fa-"],
+span[class*="fa-"] {
+    font-family: "Font Awesome 6 Free", "Font Awesome 6 Brands", FontAwesome, sans-serif !important;
+}
+
+.fa-brands,
+.fab,
+i.fa-brands,
+span.fa-brands {
+    font-family: "Font Awesome 6 Brands", FontAwesome, sans-serif !important;
+}

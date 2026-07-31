@@ -1,6 +1,6 @@
 /* ==========================================================================
    AMWAJ TRAVEL & TOURISM - ENTERPRISE DESIGN TOKENS
-   Single Source of Truth (SSOT)
+   Single Source of Truth (SSOT) & Unified Motion Architecture
    Category A License No. 1766 (Kafr El Sheikh, Egypt)
    ========================================================================== */
 
@@ -36,14 +36,16 @@
     --color-border-light: #E2E8F0;
 
     /* Glassmorphism Tokens */
-    --glass-bg-light: rgba(255, 255, 255, 0.88);
+    --glass-bg-light: rgba(255, 255, 255, 0.85);
     --glass-bg-dark: rgba(8, 24, 38, 0.88);
-    --glass-border-light: rgba(0, 153, 216, 0.1);
-    --glass-border-dark: rgba(255, 255, 255, 0.07);
-    --glass-inner-highlight: inset 0 1px 1px rgba(255, 255, 255, 0.15);
+    --glass-border-light: rgba(0, 153, 216, 0.12);
+    --glass-border-dark: rgba(255, 255, 255, 0.08);
+    --glass-inner-highlight: inset 0 1px 1px rgba(255, 255, 255, 0.2);
 
     /* Typography Scale (Fluid Clamping) */
-    --font-sans: 'Cairo', 'Plus Jakarta Sans', system-ui, sans-serif;
+    --font-sans: 'IBM Plex Sans Arabic', 'Plus Jakarta Sans', system-ui, sans-serif;
+    --font-arabic: 'IBM Plex Sans Arabic', system-ui, sans-serif;
+    --font-english: 'Plus Jakarta Sans', system-ui, sans-serif;
     --font-serif: 'Playfair Display', 'Lora', Georgia, serif;
     --font-mono: 'JetBrains Mono', 'Geist Mono', monospace;
 
@@ -62,37 +64,39 @@
     --radius-3xl: 2.5rem;  /* 40px */
     --radius-full: 9999px;
 
-    /* Shadows & Elevation — tinted with brand hue, not black */
-    --shadow-sm: 0 1px 2px 0 rgba(8, 24, 38, 0.06);
-    --shadow-md: 0 4px 8px -1px rgba(0, 153, 216, 0.1), 0 2px 4px -1px rgba(8, 24, 38, 0.06);
-    --shadow-lg: 0 10px 20px -3px rgba(0, 153, 216, 0.18), 0 4px 8px -2px rgba(0, 153, 216, 0.08);
-    --shadow-xl: 0 24px 40px -6px rgba(8, 24, 38, 0.22), 0 10px 16px -4px rgba(0, 153, 216, 0.08);
-    --shadow-glow: 0 0 24px rgba(0, 153, 216, 0.4);
-    --shadow-gold: 0 8px 20px -4px rgba(253, 186, 33, 0.35);
+    /* Multi-layered Ambient Shadows */
+    --shadow-sm: 0 1px 2px 0 rgba(8, 24, 38, 0.05);
+    --shadow-md: 0 4px 12px -2px rgba(0, 153, 216, 0.08), 0 2px 4px -1px rgba(8, 24, 38, 0.04);
+    --shadow-lg: 0 12px 24px -4px rgba(0, 153, 216, 0.15), 0 4px 8px -2px rgba(8, 24, 38, 0.06);
+    --shadow-xl: 0 24px 48px -8px rgba(8, 24, 38, 0.2), 0 10px 18px -4px rgba(0, 153, 216, 0.08);
+    --shadow-glow: 0 0 28px rgba(0, 153, 216, 0.35);
+    --shadow-gold: 0 8px 24px -4px rgba(253, 186, 33, 0.35);
 
-    /* Animation Easing & Durations — spring physics */
-    --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
-    --ease-spring-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+    /* Motion Architecture Tokens (Enterprise Standard) */
+    --duration-instant: 120ms;
+    --duration-fast: 180ms;
+    --duration-normal: 250ms;
+    --duration-medium: 400ms;
+    --duration-slow: 600ms;
+
+    --ease-apple: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
     --ease-smooth: cubic-bezier(0.25, 0.46, 0.45, 0.94);
     --ease-decel: cubic-bezier(0.0, 0.0, 0.2, 1);
-    --duration-fast: 150ms;
-    --duration-normal: 300ms;
-    --duration-slow: 600ms;
-    --duration-cinematic: 800ms;
 
-    /* Section spacing */
+    /* Section Spacing & Containment */
     --section-py: clamp(5rem, 8vw, 7.5rem);
     --container-max: 80rem; /* 1280px */
 }
 
 /* Glass Surface Utility */
 .glass-effect {
-    backdrop-filter: blur(18px) saturate(150%);
-    -webkit-backdrop-filter: blur(18px) saturate(150%);
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
     box-shadow: var(--glass-inner-highlight);
 }
 
-/* RTL / LTR Language Rule Visibility */
+/* RTL / LTR Language Visibility */
 html[lang="ar"] .lang-en { display: none !important; }
 html[lang="en"] .lang-ar { display: none !important; }
 

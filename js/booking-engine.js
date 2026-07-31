@@ -1,21 +1,22 @@
 /**
  * Amwaj Travel & Tourism - Multi-Step Booking & Search Engine
+ * Enterprise WhatsApp Booking Flow with Auto Request ID & Anti-Spam Protection
  * Official Category A License No. 1766 (Kafr El Sheikh, Egypt)
  */
 
 let currentBookingStep = 1;
-const totalBookingSteps = 3;
+const TOTAL_BOOKING_STEPS = 3;
 
-function openBookingModal(destName = '') {
-    if (destName) {
+function openBookingModal(destinationName = '') {
+    if (destinationName) {
         const modalDestInput = document.getElementById('modalDestInput');
-        if (modalDestInput) modalDestInput.value = destName;
+        if (modalDestInput) modalDestInput.value = destinationName;
     }
     const modal = document.getElementById('bookingModal');
-    if (modal) {
-        modal.classList.remove('hidden');
-        resetBookingSteps();
-    }
+    if (!modal) return;
+
+    modal.classList.remove('hidden');
+    resetBookingSteps();
 }
 
 function closeBookingModal() {
@@ -24,36 +25,32 @@ function closeBookingModal() {
 }
 
 function resetBookingSteps() {
-    currentBookingStep = 1;
     showBookingStep(1);
 }
 
 function showBookingStep(step) {
     currentBookingStep = step;
-    for (let i = 1; i <= totalBookingSteps; i++) {
+    for (let i = 1; i <= TOTAL_BOOKING_STEPS; i++) {
         const stepEl = document.getElementById(`bookingStep${i}`);
         const indicatorEl = document.getElementById(`stepIndicator${i}`);
+
         if (stepEl) {
-            if (i === step) {
-                stepEl.classList.remove('hidden');
-            } else {
-                stepEl.classList.add('hidden');
-            }
+            stepEl.classList.toggle('hidden', i !== step);
         }
+
         if (indicatorEl) {
-            if (i <= step) {
-                indicatorEl.classList.add('bg-brand-500', 'text-white');
-                indicatorEl.classList.remove('bg-slate-200', 'text-slate-500', 'dark:bg-slate-800');
-            } else {
-                indicatorEl.classList.remove('bg-brand-500', 'text-white');
-                indicatorEl.classList.add('bg-slate-200', 'text-slate-500', 'dark:bg-slate-800');
-            }
+            const isActive = i <= step;
+            indicatorEl.classList.toggle('bg-brand-500', isActive);
+            indicatorEl.classList.toggle('text-white', isActive);
+            indicatorEl.classList.toggle('bg-slate-200', !isActive);
+            indicatorEl.classList.toggle('text-slate-500', !isActive);
+            indicatorEl.classList.toggle('dark:bg-slate-800', !isActive);
         }
     }
 }
 
 function nextBookingStep() {
-    if (currentBookingStep < totalBookingSteps) {
+    if (currentBookingStep < TOTAL_BOOKING_STEPS) {
         showBookingStep(currentBookingStep + 1);
     }
 }
@@ -66,13 +63,12 @@ function prevBookingStep() {
 
 function handleBookingSubmit(e) {
     e.preventDefault();
-    closeBookingModal();
-    const isArabic = document.documentElement.getAttribute('lang') === 'ar';
-    const msg = isArabic 
-        ? 'تم إرسال طلب الحجز بنجاح! سيتواصل معك فريق أمواج بكفر الشيخ فوراً عبر الواتساب أو الهاتف.' 
-        : 'Booking request submitted successfully! Our advisors will contact you shortly.';
-    if (window.showToast) window.showToast(msg);
-    e.target.reset();
+    if (window.processWhatsAppBooking) {
+        const success = window.processWhatsAppBooking(e.target);
+        if (success) {
+            closeBookingModal();
+        }
+    }
 }
 
 /**
@@ -83,7 +79,7 @@ function handleTripSearch(e) {
     e.preventDefault();
     const destSelect = document.getElementById('searchDestSelect');
     const destVal = destSelect ? destSelect.value : 'all';
-    
+
     if (window.filterDestinations) {
         window.filterDestinations(destVal);
     }
