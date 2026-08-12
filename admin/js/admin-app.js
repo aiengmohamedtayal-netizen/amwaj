@@ -161,7 +161,7 @@
     const meta = collectionMeta[kind];
     if (!rows.length) return `<div class="empty-state"><div><i class="fa-solid ${meta.icon}"></i><h3>لا توجد ${meta.plural} مطابقة</h3><p>ابدأ بإضافة ${meta.singular} جديدة أو غيّر عبارة البحث.</p></div></div>`;
     return `<div class="table-scroll"><table><thead><tr><th>${meta.image ? 'المحتوى' : 'الخدمة'}</th><th>الفئة</th><th>الحالة</th><th>آخر تحديث</th><th><span class="sr-only">إجراءات</span></th></tr></thead><tbody>
-      ${rows.map((row) => `<tr><td><div class="row-title">${meta.image ? `<img class="row-image" src="${escapeHtml(safeUrl(row.image_url))}" alt="" onerror="this.style.visibility='hidden'">` : `<span class="row-image" aria-hidden="true"><i class="fa-solid ${escapeHtml(row.icon_class || 'fa-star')}"></i></span>`}<span><strong>${escapeHtml(row.title_ar)}</strong><span>${escapeHtml(row.title_en)}</span></span></div></td><td>${escapeHtml(meta.categories.find(([key]) => key === row.category)?.[1] || row.category || '—')}</td><td><div style="display:flex;gap:.35rem;flex-wrap:wrap">${statusMarkup(row)}${row.is_featured ? '<span class="badge badge-featured"><i class="fa-solid fa-star"></i> مميز</span>' : ''}</div></td><td><span class="muted">${formatDate(row.updated_at)}</span></td><td><div class="table-actions"><button class="btn btn-small" data-action="preview" data-kind="${kind}" data-id="${row.id}" aria-label="معاينة ${escapeHtml(row.title_ar)}"><i class="fa-regular fa-eye"></i></button><button class="btn btn-small" data-action="edit-item" data-kind="${kind}" data-id="${row.id}" aria-label="تعديل ${escapeHtml(row.title_ar)}"><i class="fa-solid fa-pen"></i></button>${meta.featured ? `<button class="btn btn-small" data-action="toggle-featured" data-kind="${kind}" data-id="${row.id}" aria-label="تغيير حالة التمييز"><i class="fa-solid fa-star"></i></button>` : ''}<button class="btn btn-small ${row.is_active ? 'btn-danger' : ''}" data-action="toggle-archive" data-kind="${kind}" data-id="${row.id}" aria-label="${row.is_active ? 'أرشفة' : 'إعادة تفعيل'} ${escapeHtml(row.title_ar)}"><i class="fa-solid ${row.is_active ? 'fa-box-archive' : 'fa-rotate-left'}"></i></button></div></td></tr>`).join('')}
+      ${rows.map((row) => `<tr><td><div class="row-title">${meta.image ? `<img class="row-image" src="${escapeHtml(safeUrl(row.image_url))}" alt="" onerror="this.style.visibility='hidden'">` : `<span class="row-image" aria-hidden="true"><i class="fa-solid ${escapeHtml(row.icon_class || 'fa-star')}"></i></span>`}<span><strong>${escapeHtml(row.title_ar)}</strong><span>${escapeHtml(row.title_en)}</span></span></div></td><td>${escapeHtml(meta.categories.find(([key]) => key === row.category)?.[1] || row.category || '—')}</td><td><div style="display:flex;gap:.35rem;flex-wrap:wrap">${statusMarkup(row)}${row.is_featured ? '<span class="badge badge-featured"><i class="fa-solid fa-star"></i> مميز</span>' : ''}</div></td><td><span class="muted">${formatDate(row.updated_at)}</span></td><td><div class="table-actions"><button class="btn btn-small" data-action="preview" data-kind="${kind}" data-id="${row.id}" aria-label="معاينة ${escapeHtml(row.title_ar)}"><i class="fa-regular fa-eye"></i></button><button class="btn btn-small" data-action="edit-item" data-kind="${kind}" data-id="${row.id}" aria-label="تعديل ${escapeHtml(row.title_ar)}"><i class="fa-solid fa-pen"></i></button>${meta.featured ? `<button class="btn btn-small" data-action="toggle-featured" data-kind="${kind}" data-id="${row.id}" aria-label="تغيير حالة التمييز"><i class="fa-solid fa-star"></i></button>` : ''}<button class="btn btn-small ${row.is_active ? 'btn-danger' : ''}" data-action="toggle-archive" data-kind="${kind}" data-id="${row.id}" aria-label="${row.is_active ? 'أرشفة' : 'إعادة تفعيل'} ${escapeHtml(row.title_ar)}"><i class="fa-solid ${row.is_active ? 'fa-box-archive' : 'fa-rotate-left'}"></i></button><button class="btn btn-small btn-danger" data-action="delete-item" data-kind="${kind}" data-id="${row.id}" aria-label="حذف ${escapeHtml(row.title_ar)}"><i class="fa-solid fa-trash"></i></button></div></td></tr>`).join('')}
     </tbody></table></div>`;
   }
 
@@ -321,6 +321,19 @@
     } catch (error) { showToast('error', 'تعذر تحديث العنصر', error.message); }
   }
 
+  async function deleteItem(kind, id) {
+    const meta = collectionMeta[kind];
+    const item = (state.collections[kind] || []).find((row) => row.id === id);
+    if (!item) return;
+    const offerNote = kind === 'packages' || kind === 'services' ? '\nسيُحذف أيضًا أي عرض سعر مرتبط بهذا العنصر.' : kind === 'destinations' ? '\nلا يمكن حذف الوجهة إن كانت مرتبطة بعروض أسعار؛ احذف العروض أو غيّر وجهتها أولًا.' : '';
+    if (!window.confirm(`هل تريد حذف ${meta.singular} «${item.title_ar}» نهائيًا؟\nلا يمكن التراجع عن هذا الإجراء.${offerNote}`)) return;
+    try {
+      await client.remove(meta.table, id);
+      showToast('success', 'تم حذف العنصر', `حُذفت ${meta.singular} من قاعدة البيانات.`);
+      await renderCollection(kind);
+    } catch (error) { showToast('error', 'تعذر حذف العنصر', error.message); }
+  }
+
   const offerModes = [['quote', 'طلب عرض سعر'], ['fixed', 'سعر ثابت'], ['starting_from', 'يبدأ من'], ['discount', 'خصم']];
   const offerAvailability = [['available', 'متاح'], ['limited', 'مقاعد محدودة'], ['sold_out', 'نفدت المقاعد']];
   const offerStatuses = [['draft', 'مسودة'], ['published', 'منشور'], ['archived', 'مؤرشف']];
@@ -388,7 +401,7 @@
         <td><input class="input sheet-input" data-offer-field="discounted_price_amount" type="number" min="0" step="0.01" value="${item.discounted_price_amount ?? ''}" aria-label="سعر الخصم للفرد بالجنيه المصري"><small class="muted">ج.م./فرد</small></td>
         <td><select class="select sheet-select" data-offer-field="availability">${optionList(offerAvailability, item.availability)}</select><input class="input sheet-input" data-offer-field="seats_available" type="number" min="0" value="${item.seats_available ?? ''}" placeholder="المقاعد" aria-label="المقاعد المتاحة"></td>
         <td><select class="select sheet-select" data-offer-field="status">${optionList(offerStatuses, item.status)}</select><div style="margin-top:.35rem">${offerStatusMarkup(item)}</div></td>
-        <td><div class="table-actions"><button class="btn btn-small" type="button" data-action="preview-offer" data-id="${item.id}" aria-label="معاينة العرض"><i class="fa-regular fa-eye"></i></button><button class="btn btn-small" type="button" data-action="edit-offer" data-id="${item.id}" aria-label="تفاصيل العرض"><i class="fa-solid fa-pen"></i></button><button class="btn btn-primary btn-small" type="button" data-action="save-offer-row" data-id="${item.id}"><i class="fa-solid fa-floppy-disk"></i> حفظ</button></div></td>
+        <td><div class="table-actions"><button class="btn btn-small" type="button" data-action="preview-offer" data-id="${item.id}" aria-label="معاينة العرض"><i class="fa-regular fa-eye"></i></button><button class="btn btn-small" type="button" data-action="edit-offer" data-id="${item.id}" aria-label="تفاصيل العرض"><i class="fa-solid fa-pen"></i></button><button class="btn btn-small btn-danger" type="button" data-action="delete-offer" data-id="${item.id}" aria-label="حذف عرض السعر"><i class="fa-solid fa-trash"></i></button><button class="btn btn-primary btn-small" type="button" data-action="save-offer-row" data-id="${item.id}"><i class="fa-solid fa-floppy-disk"></i> حفظ</button></div></td>
       </tr>`;
     }).join('');
   }
@@ -508,6 +521,18 @@
     } catch (error) { showToast('error', 'تعذر حفظ صف السعر', error.message); button.disabled = false; }
   }
 
+  async function deleteOffer(id) {
+    const offer = (state.pricing?.offers || []).find((item) => item.id === id);
+    if (!offer) return;
+    const subject = offerSubject(offer);
+    if (!window.confirm(`هل تريد حذف عرض السعر المرتبط بـ «${subject.title_ar}» نهائيًا؟\nلن يظهر هذا العرض في محرك البحث بعد الحذف.`)) return;
+    try {
+      await client.remove('pricing_offers', id);
+      showToast('success', 'تم حذف عرض السعر', 'أُزيل العرض من محرك البحث وقاعدة البيانات.');
+      await renderPricing();
+    } catch (error) { showToast('error', 'تعذر حذف عرض السعر', error.message); }
+  }
+
   async function saveOfferEditor(button) {
     const dialog = button.closest('dialog');
     const form = dialog.querySelector('#offer-editor');
@@ -597,7 +622,7 @@
 
   function blogListRows(posts) {
     if (!posts.length) return '<div class="empty-state"><div><i class="fa-solid fa-newspaper"></i><h3>لا توجد مقالات مطابقة</h3><p>ابدأ بمسودة جديدة ثم راجعها وانشرها عند الجاهزية.</p></div></div>';
-    return `<div class="table-scroll"><table><thead><tr><th>المقال</th><th>التصنيف</th><th>الحالة</th><th>النشر / التحديث</th><th><span class="sr-only">إجراءات</span></th></tr></thead><tbody>${posts.map((post) => `<tr><td><div class="row-title">${post.featured_image_url ? `<img class="row-image" src="${escapeHtml(safeUrl(post.featured_image_url))}" alt="" onerror="this.style.visibility='hidden'">` : '<span class="row-image" aria-hidden="true"><i class="fa-solid fa-newspaper"></i></span>'}<span><strong>${escapeHtml(post.title_ar)}</strong><span>${escapeHtml(post.title_en)}</span></span></div></td><td>${escapeHtml(post.blog_categories?.title_ar || '—')}</td><td><div style="display:flex;gap:.35rem;flex-wrap:wrap">${blogStatusMarkup(post)}${post.is_featured ? '<span class="badge badge-featured"><i class="fa-solid fa-star"></i> مميز</span>' : ''}</div></td><td><span class="muted">${post.published_at ? `نشر: ${formatDate(post.published_at)}` : `تحديث: ${formatDate(post.updated_at)}`}</span></td><td><div class="table-actions"><button class="btn btn-small" data-action="preview-blog" data-id="${post.id}" aria-label="معاينة المقال"><i class="fa-regular fa-eye"></i></button><button class="btn btn-small" data-action="edit-blog" data-id="${post.id}" aria-label="تعديل المقال"><i class="fa-solid fa-pen"></i></button>${post.status !== 'published' ? `<button class="btn btn-small" data-action="publish-blog" data-id="${post.id}" aria-label="نشر المقال"><i class="fa-solid fa-upload"></i></button>` : `<button class="btn btn-small" data-action="archive-blog" data-id="${post.id}" aria-label="أرشفة المقال"><i class="fa-solid fa-box-archive"></i></button>`}${post.status === 'draft' ? `<button class="btn btn-small btn-danger" data-action="delete-blog-draft" data-id="${post.id}" aria-label="حذف المسودة"><i class="fa-solid fa-trash"></i></button>` : ''}</div></td></tr>`).join('')}</tbody></table></div>`;
+    return `<div class="table-scroll"><table><thead><tr><th>المقال</th><th>التصنيف</th><th>الحالة</th><th>النشر / التحديث</th><th><span class="sr-only">إجراءات</span></th></tr></thead><tbody>${posts.map((post) => `<tr><td><div class="row-title">${post.featured_image_url ? `<img class="row-image" src="${escapeHtml(safeUrl(post.featured_image_url))}" alt="" onerror="this.style.visibility='hidden'">` : '<span class="row-image" aria-hidden="true"><i class="fa-solid fa-newspaper"></i></span>'}<span><strong>${escapeHtml(post.title_ar)}</strong><span>${escapeHtml(post.title_en)}</span></span></div></td><td>${escapeHtml(post.blog_categories?.title_ar || '—')}</td><td><div style="display:flex;gap:.35rem;flex-wrap:wrap">${blogStatusMarkup(post)}${post.is_featured ? '<span class="badge badge-featured"><i class="fa-solid fa-star"></i> مميز</span>' : ''}</div></td><td><span class="muted">${post.published_at ? `نشر: ${formatDate(post.published_at)}` : `تحديث: ${formatDate(post.updated_at)}`}</span></td><td><div class="table-actions"><button class="btn btn-small" data-action="preview-blog" data-id="${post.id}" aria-label="معاينة المقال"><i class="fa-regular fa-eye"></i></button><button class="btn btn-small" data-action="edit-blog" data-id="${post.id}" aria-label="تعديل المقال"><i class="fa-solid fa-pen"></i></button>${post.status !== 'published' ? `<button class="btn btn-small" data-action="publish-blog" data-id="${post.id}" aria-label="نشر المقال"><i class="fa-solid fa-upload"></i></button>` : `<button class="btn btn-small" data-action="archive-blog" data-id="${post.id}" aria-label="أرشفة المقال"><i class="fa-solid fa-box-archive"></i></button>`}<button class="btn btn-small btn-danger" data-action="delete-blog" data-id="${post.id}" aria-label="حذف المقال"><i class="fa-solid fa-trash"></i></button></div></td></tr>`).join('')}</tbody></table></div>`;
   }
 
   function openBlogEditor(post) {
@@ -650,7 +675,7 @@
 
   function categoryRows(categories) {
     if (!categories.length) return '<div class="empty-state"><div><i class="fa-solid fa-folder-tree"></i><h3>لا توجد تصنيفات</h3><p>أضف تصنيفًا صغيرًا ومحددًا قبل إنشاء المقالات.</p></div></div>';
-    return `<div class="table-scroll"><table><thead><tr><th>التصنيف</th><th>الرابط</th><th>الحالة</th><th>إجراءات</th></tr></thead><tbody>${categories.map((category) => `<tr><td><strong>${escapeHtml(category.title_ar)}</strong><br><span class="muted">${escapeHtml(category.title_en)}</span></td><td dir="ltr">${escapeHtml(category.slug)}</td><td>${category.status === 'active' ? '<span class="badge badge-published">نشط</span>' : '<span class="badge badge-archived">مؤرشف</span>'}</td><td><div class="table-actions"><button class="btn btn-small" data-action="edit-blog-category" data-id="${category.id}"><i class="fa-solid fa-pen"></i></button><button class="btn btn-small" data-action="toggle-blog-category" data-id="${category.id}"><i class="fa-solid fa-box-archive"></i></button></div></td></tr>`).join('')}</tbody></table></div>`;
+    return `<div class="table-scroll"><table><thead><tr><th>التصنيف</th><th>الرابط</th><th>الحالة</th><th>إجراءات</th></tr></thead><tbody>${categories.map((category) => `<tr><td><strong>${escapeHtml(category.title_ar)}</strong><br><span class="muted">${escapeHtml(category.title_en)}</span></td><td dir="ltr">${escapeHtml(category.slug)}</td><td>${category.status === 'active' ? '<span class="badge badge-published">نشط</span>' : '<span class="badge badge-archived">مؤرشف</span>'}</td><td><div class="table-actions"><button class="btn btn-small" data-action="edit-blog-category" data-id="${category.id}"><i class="fa-solid fa-pen"></i></button><button class="btn btn-small" data-action="toggle-blog-category" data-id="${category.id}"><i class="fa-solid fa-box-archive"></i></button><button class="btn btn-small btn-danger" data-action="delete-blog-category" data-id="${category.id}" aria-label="حذف التصنيف"><i class="fa-solid fa-trash"></i></button></div></td></tr>`).join('')}</tbody></table></div>`;
   }
 
   function openCategoryEditor(category) {
@@ -697,17 +722,27 @@
     try { await client.update('blog_posts', id, { status, is_featured: status === 'published' ? post.is_featured : false, ...(status === 'published' ? { published_at: post.published_at || new Date().toISOString() } : {}) }); showToast('success', status === 'published' ? 'تم نشر المقال' : 'تمت أرشفة المقال', 'تم تحديث حالته في المصدر المركزي.'); await renderBlog(); } catch (error) { showToast('error', 'تعذر تحديث المقال', error.message); }
   }
 
-  async function deleteBlogDraft(id) {
+  async function deleteBlog(id) {
     const post = (state.blog?.posts || []).find((item) => item.id === id);
-    if (!post || post.status !== 'draft') { showToast('error', 'لا يمكن حذف المقال', 'الحذف متاح للمسودات فقط؛ أرشف المحتوى المنشور بدلًا من ذلك.'); return; }
-    if (!window.confirm(`هل تريد حذف المسودة «${post.title_ar}» نهائيًا؟`)) return;
-    try { await client.remove('blog_posts', id); showToast('success', 'تم حذف المسودة', 'لم يعد هذا المحتوى محفوظًا في قاعدة البيانات.'); await renderBlog(); } catch (error) { showToast('error', 'تعذر حذف المسودة', error.message); }
+    if (!post) return;
+    const liveNote = post.status === 'published' ? '\nالمقال منشور الآن وسيختفي من الموقع العام فورًا.' : '';
+    if (!window.confirm(`هل تريد حذف المقال «${post.title_ar}» نهائيًا؟\nلا يمكن التراجع عن هذا الإجراء.${liveNote}`)) return;
+    try { await client.remove('blog_posts', id); showToast('success', 'تم حذف المقال', 'أُزيل المقال من قاعدة البيانات ومن الموقع العام إن كان منشورًا.'); await renderBlog(); } catch (error) { showToast('error', 'تعذر حذف المقال', error.message); }
   }
 
   async function toggleBlogCategory(id) {
     const category = (state.blog?.categories || []).find((item) => item.id === id);
     if (!category) return;
     try { await client.update('blog_categories', id, { status: category.status === 'active' ? 'archived' : 'active' }); showToast('success', 'تم تحديث التصنيف', 'تم حفظ حالة التصنيف في المصدر المركزي.'); await renderBlog(); } catch (error) { showToast('error', 'تعذر تحديث التصنيف', error.message); }
+  }
+
+  async function deleteBlogCategory(id) {
+    const category = (state.blog?.categories || []).find((item) => item.id === id);
+    if (!category) return;
+    const linkedPosts = (state.blog?.posts || []).filter((post) => post.category_id === id).length;
+    if (linkedPosts) { showToast('error', 'لا يمكن حذف التصنيف', `التصنيف مرتبط بـ ${linkedPosts} مقال؛ انقل المقالات إلى تصنيف آخر أولًا.`); return; }
+    if (!window.confirm(`هل تريد حذف التصنيف «${category.title_ar}» نهائيًا؟\nلا يمكن التراجع عن هذا الإجراء.`)) return;
+    try { await client.remove('blog_categories', id); showToast('success', 'تم حذف التصنيف', 'أُزيل التصنيف من قاعدة البيانات.'); await renderBlog(); } catch (error) { showToast('error', 'تعذر حذف التصنيف', error.message); }
   }
 
   async function renderPage() {
@@ -736,10 +771,12 @@
     if (action === 'save-item') saveItem(target);
     if (action === 'toggle-featured') updateItemAction(target.dataset.kind, target.dataset.id, 'featured');
     if (action === 'toggle-archive') { const row = (state.collections[target.dataset.kind] || []).find((item) => item.id === target.dataset.id); if (row) updateItemAction(target.dataset.kind, target.dataset.id, row.is_active ? 'archive' : 'restore'); }
+    if (action === 'delete-item') deleteItem(target.dataset.kind, target.dataset.id);
     if (action === 'new-offer') openOfferEditor(null);
     if (action === 'edit-offer') { const row = (state.pricing?.offers || []).find((item) => item.id === target.dataset.id); if (row) openOfferEditor(row); }
     if (action === 'preview-offer') { const row = (state.pricing?.offers || []).find((item) => item.id === target.dataset.id); if (row) openOfferPreview(row); }
     if (action === 'save-offer-row') saveOfferRow(target);
+    if (action === 'delete-offer') deleteOffer(target.dataset.id);
     if (action === 'save-offer-editor') saveOfferEditor(target);
     if (action === 'edit-setting') { const row = (state.collections.settings || []).find((item) => item.setting_key === target.dataset.key); if (row) openSettingEditor(row); }
     if (action === 'save-setting') saveSetting(target);
@@ -749,11 +786,12 @@
     if (action === 'save-blog') saveBlog(target);
     if (action === 'publish-blog') updateBlogStatus(target.dataset.id, 'published');
     if (action === 'archive-blog') updateBlogStatus(target.dataset.id, 'archived');
-    if (action === 'delete-blog-draft') deleteBlogDraft(target.dataset.id);
+    if (action === 'delete-blog') deleteBlog(target.dataset.id);
     if (action === 'new-blog-category') openCategoryEditor(null);
     if (action === 'edit-blog-category') { const category = (state.blog?.categories || []).find((item) => item.id === target.dataset.id); if (category) openCategoryEditor(category); }
     if (action === 'save-blog-category') saveBlogCategory(target);
     if (action === 'toggle-blog-category') toggleBlogCategory(target.dataset.id);
+    if (action === 'delete-blog-category') deleteBlogCategory(target.dataset.id);
     if (action === 'close-dialog') target.closest('dialog')?.close();
   }
 
