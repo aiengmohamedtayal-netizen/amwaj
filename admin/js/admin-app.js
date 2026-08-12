@@ -62,6 +62,12 @@
     window.setTimeout(() => toast.remove(), 5200);
   }
 
+  function setButtonBusy(button, busy) {
+    if (!button) return;
+    button.disabled = busy;
+    button.setAttribute('aria-busy', String(busy));
+  }
+
   function statusMarkup(row) {
     if (!row.is_active) return '<span class="badge badge-archived"><i class="fa-solid fa-box-archive"></i> مؤرشف</span>';
     if (row.status === 'published') return '<span class="badge badge-published"><i class="fa-solid fa-circle-check"></i> منشور</span>';
@@ -90,7 +96,11 @@
       ['pricing', 'fa-tags', 'التسعير'], ['blog', 'fa-newspaper', 'المدونة'], ['reviews', 'fa-star-half-stroke', 'آراء العملاء'], ['settings', 'fa-sliders', 'الإعدادات']
     ];
     return `<div class="admin-shell">
-      <aside class="sidebar" id="admin-sidebar" aria-label="التنقل الإداري">
+      <aside class="sidebar" id="admin-sidebar" aria-label="التنقل الإداري" aria-hidden="false">
+        <div class="sidebar-mobile-head">
+          <span>قائمة الإدارة</span>
+          <button class="btn icon-btn sidebar-close" type="button" data-action="close-nav" aria-label="إغلاق القائمة"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+        </div>
         <a class="brand" href="/admin/" data-action="navigate" aria-label="لوحة تحكم أمواج">
           <img src="/assets/logo.png" alt="شعار أمواج للسياحة"><span><strong>أمواج للسياحة</strong><small>AMWAJ ADMIN</small></span>
         </a>
@@ -106,10 +116,10 @@
       <button class="sidebar-backdrop" type="button" data-action="close-nav" aria-label="إغلاق القائمة الجانبية"></button>
       <section class="main-area">
         <header class="topbar">
-          <div class="topbar-label"><button class="btn icon-btn mobile-nav-toggle" type="button" data-action="toggle-nav" aria-label="فتح القائمة"><i class="fa-solid fa-bars"></i></button><div><h1>${escapeHtml(pageLabel.title)}</h1><p>${escapeHtml(pageLabel.subtitle)}</p></div></div>
-          <div class="topbar-actions"><button class="btn btn-small" type="button" data-action="export-pdf"><i class="fa-solid fa-file-pdf"></i> تصدير PDF</button><a class="btn btn-small" href="/" target="_blank" rel="noopener"><i class="fa-solid fa-arrow-up-right-from-square"></i> عرض الموقع العام</a></div>
+          <div class="topbar-label"><button class="btn icon-btn mobile-nav-toggle" type="button" data-action="toggle-nav" aria-label="فتح القائمة" aria-controls="admin-sidebar" aria-expanded="false"><span class="nav-toggle-glyph" aria-hidden="true"><span></span><span></span><span></span></span></button><div class="topbar-copy"><p class="page-kicker"><i class="fa-solid fa-sparkles" aria-hidden="true"></i> مساحة الإدارة</p><h1>${escapeHtml(pageLabel.title)}</h1><p>${escapeHtml(pageLabel.subtitle)}</p></div></div>
+          <div class="topbar-actions"><button class="btn btn-small" type="button" data-action="export-pdf" title="تصدير الصفحة الحالية كملف PDF"><i class="fa-solid fa-file-pdf" aria-hidden="true"></i> تصدير PDF</button><a class="btn btn-small" href="/" target="_blank" rel="noopener" title="فتح الموقع العام في علامة تبويب جديدة"><i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i> عرض الموقع العام</a></div>
         </header>
-        <main id="admin-content" class="page-content" tabindex="-1">${content}</main>
+        <main id="admin-content" class="page-content" tabindex="-1" data-page="${escapeHtml(state.page)}">${content}</main>
       </section>
     </div>`;
   }
@@ -213,12 +223,44 @@
 
   function openDialog(title, subtitle, body, footer) {
     const dialog = document.createElement('dialog');
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     dialog.className = 'dialog';
-    dialog.innerHTML = `<div class="dialog-content"><header class="dialog-header"><div><h3>${escapeHtml(title)}</h3>${subtitle ? `<p>${escapeHtml(subtitle)}</p>` : ''}</div><button class="close-dialog" type="button" aria-label="إغلاق" data-close-dialog><i class="fa-solid fa-xmark"></i></button></header><div class="dialog-body">${body}</div>${footer ? `<footer class="dialog-footer">${footer}</footer>` : ''}</div>`;
+    dialog.innerHTML = `<div class="dialog-content"><header class="dialog-header"><div><h3>${escapeHtml(title)}</h3>${subtitle ? `<p>${escapeHtml(subtitle)}</p>` : ''}<span class="dialog-state" data-dialog-state aria-live="polite"><i class="fa-solid fa-circle-check" aria-hidden="true"></i><span>جميع التغييرات محفوظة</span></span></div><button class="close-dialog" type="button" aria-label="إغلاق" data-close-dialog><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></header><div class="dialog-body">${body}</div>${footer ? `<footer class="dialog-footer">${footer}</footer>` : ''}</div>`;
+    const setDirty = () => {
+      const stateElement = dialog.querySelector('[data-dialog-state]');
+      if (!stateElement || stateElement.classList.contains('is-dirty')) return;
+      stateElement.classList.add('is-dirty');
+      stateElement.innerHTML = '<i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i><span>توجد تعديلات غير محفوظة</span>';
+    };
+    const updateLocalPreview = (input) => {
+      const file = input.files?.[0];
+      if (!file) return;
+      const field = input.closest('.media-upload-field');
+      if (!field) return;
+      const oldPreview = field.querySelector('.media-upload-preview');
+      if (oldPreview?.dataset.objectUrl) URL.revokeObjectURL(oldPreview.dataset.objectUrl);
+      const preview = oldPreview || document.createElement('img');
+      preview.className = 'media-upload-preview';
+      preview.alt = '';
+      const objectUrl = URL.createObjectURL(file);
+      preview.src = objectUrl;
+      preview.dataset.objectUrl = objectUrl;
+      if (!oldPreview) field.append(preview);
+    };
     document.body.append(dialog);
     dialog.querySelector('[data-close-dialog]')?.addEventListener('click', () => dialog.close());
-    dialog.addEventListener('close', () => dialog.remove());
+    dialog.addEventListener('input', (event) => { if (event.target.closest('form')) setDirty(); });
+    dialog.addEventListener('change', (event) => {
+      if (event.target.closest('form')) setDirty();
+      if (event.target.matches('input[type="file"]')) updateLocalPreview(event.target);
+    });
+    dialog.addEventListener('close', () => {
+      dialog.querySelectorAll('.media-upload-preview[data-object-url]').forEach((image) => URL.revokeObjectURL(image.dataset.objectUrl));
+      dialog.remove();
+      if (opener?.isConnected) opener.focus({ preventScroll: true });
+    });
     dialog.showModal();
+    window.requestAnimationFrame(() => dialog.querySelector('input:not([type="hidden"]), select, textarea, button')?.focus());
     return dialog;
   }
 
@@ -287,7 +329,7 @@
     if (!form.reportValidity()) return;
     const kind = button.dataset.kind;
     const meta = collectionMeta[kind];
-    button.disabled = true;
+    setButtonBusy(button, true);
     try {
       const imageFile = form.querySelector('[name="image_file"]')?.files?.[0];
       if (imageFile) {
@@ -305,7 +347,7 @@
       await renderCollection(kind);
     } catch (error) {
       showToast('error', 'تعذر حفظ التغييرات', error.message);
-      button.disabled = false;
+      setButtonBusy(button, false);
     }
   }
 
@@ -517,11 +559,11 @@
     const row = button.closest('tr');
     try {
       const payload = offerPayload(row);
-      button.disabled = true;
+      setButtonBusy(button, true);
       await client.update('pricing_offers', button.dataset.id, payload);
       showToast('success', 'تم حفظ صف السعر', 'تم تحديث العرض في قاعدة البيانات المركزية.');
       await renderPricing();
-    } catch (error) { showToast('error', 'تعذر حفظ صف السعر', error.message); button.disabled = false; }
+    } catch (error) { showToast('error', 'تعذر حفظ صف السعر', error.message); setButtonBusy(button, false); }
   }
 
   async function deleteOffer(id) {
@@ -542,12 +584,12 @@
     if (!form.reportValidity()) return;
     try {
       const payload = offerPayload(form, button.dataset.status);
-      button.disabled = true;
+      setButtonBusy(button, true);
       if (button.dataset.id) await client.update('pricing_offers', button.dataset.id, payload); else await client.create('pricing_offers', payload);
       dialog.close();
       showToast('success', button.dataset.status === 'published' ? 'تم نشر عرض السعر' : 'تم حفظ عرض السعر كمسودة', 'أصبح العرض محفوظًا في Supabase.');
       await renderPricing();
-    } catch (error) { showToast('error', 'تعذر حفظ عرض السعر', error.message); button.disabled = false; }
+    } catch (error) { showToast('error', 'تعذر حفظ عرض السعر', error.message); setButtonBusy(button, false); }
   }
 
   function openOfferPreview(item) {
@@ -640,8 +682,8 @@
     let value;
     try { value = JSON.parse(fieldElement.value); } catch { showToast('error', 'صيغة JSON غير صحيحة', 'تحقق من الأقواس والفواصل ثم حاول مرة أخرى.'); fieldElement.focus(); return; }
     if (Array.isArray(value) || value === null || typeof value !== 'object') { showToast('error', 'قيمة غير مدعومة', 'يجب أن تكون القيمة كائن JSON وليس قائمة أو نصًا منفردًا.'); return; }
-    button.disabled = true;
-    try { await client.updateSetting(button.dataset.key, { value }); dialog.close(); showToast('success', 'تم حفظ الإعداد', 'تم تحديث الإعداد المركزي.'); await renderSettings(); } catch (error) { showToast('error', 'تعذر حفظ الإعداد', error.message); button.disabled = false; }
+    setButtonBusy(button, true);
+    try { await client.updateSetting(button.dataset.key, { value }); dialog.close(); showToast('success', 'تم حفظ الإعداد', 'تم تحديث الإعداد المركزي.'); await renderSettings(); } catch (error) { showToast('error', 'تعذر حفظ الإعداد', error.message); setButtonBusy(button, false); }
   }
 
   function blogRoute() {
@@ -711,7 +753,7 @@
     const dialog = button.closest('dialog');
     const form = dialog.querySelector('#blog-editor');
     const existing = (state.blog?.posts || []).find((post) => post.id === button.dataset.id) || null;
-    button.disabled = true;
+    setButtonBusy(button, true);
     try {
       const imageFile = form.querySelector('[name="blog_image_file"]')?.files?.[0];
       if (imageFile) {
@@ -727,7 +769,7 @@
       await renderBlog();
     } catch (error) {
       showToast('error', 'تعذر حفظ المقال', error.message);
-      button.disabled = false;
+      setButtonBusy(button, false);
     }
   }
 
@@ -754,8 +796,8 @@
     if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) { showToast('error', 'صيغة الرابط غير صحيحة', 'استخدم أحرفًا إنجليزية صغيرة وأرقامًا وشرطات فقط.'); return; }
     const existing = (state.blog?.categories || []).find((category) => category.id === button.dataset.id);
     const payload = { slug, title_ar: values.title_ar.trim(), title_en: values.title_en.trim(), description_ar: values.description_ar.trim() || null, description_en: values.description_en.trim() || null, status: existing?.status || 'active', sort_order: Math.max(0, Number(values.sort_order || 0)) };
-    button.disabled = true;
-    try { if (existing) await client.update('blog_categories', existing.id, payload); else await client.create('blog_categories', payload); dialog.close(); showToast('success', 'تم حفظ التصنيف', 'يمكن الآن ربط المقالات بهذا التصنيف.'); await renderBlog(); } catch (error) { showToast('error', 'تعذر حفظ التصنيف', error.message); button.disabled = false; }
+    setButtonBusy(button, true);
+    try { if (existing) await client.update('blog_categories', existing.id, payload); else await client.create('blog_categories', payload); dialog.close(); showToast('success', 'تم حفظ التصنيف', 'يمكن الآن ربط المقالات بهذا التصنيف.'); await renderBlog(); } catch (error) { showToast('error', 'تعذر حفظ التصنيف', error.message); setButtonBusy(button, false); }
   }
 
   async function renderBlog() {
@@ -808,31 +850,69 @@
     try { await client.remove('blog_categories', id); showToast('success', 'تم حذف التصنيف', 'أُزيل التصنيف من قاعدة البيانات.'); await renderBlog(); } catch (error) { showToast('error', 'تعذر حذف التصنيف', error.message); }
   }
 
+  function isCompactAdminViewport() {
+    return window.matchMedia('(max-width: 1023px)').matches;
+  }
+
+  function syncMobileNavState(isOpen) {
+    const sidebar = document.getElementById('admin-sidebar');
+    const toggle = document.querySelector('[data-action="toggle-nav"]');
+    const compact = isCompactAdminViewport();
+    if (sidebar) sidebar.setAttribute('aria-hidden', String(compact && !isOpen));
+    if (toggle) {
+      toggle.setAttribute('aria-expanded', String(compact && isOpen));
+      toggle.setAttribute('aria-label', compact && isOpen ? 'إغلاق القائمة' : 'فتح القائمة');
+      toggle.classList.toggle('is-open', compact && isOpen);
+    }
+  }
+
+  function applyTableAffordances() {
+    document.querySelectorAll('.table-scroll').forEach((container) => {
+      const refresh = () => {
+        const scrollable = container.scrollWidth > container.clientWidth + 4;
+        container.classList.toggle('is-scrollable', scrollable);
+        container.classList.toggle('is-scrolled', !scrollable || Math.abs(container.scrollLeft) > 12);
+        if (scrollable) container.dataset.scrollHint = 'اسحب لرؤية بقية الجدول';
+      };
+      if (!container.dataset.uxBound) {
+        container.dataset.uxBound = 'true';
+        container.addEventListener('scroll', refresh, { passive: true });
+      }
+      refresh();
+    });
+  }
+
   async function renderPage() {
     closeMobileNav();
     state.page = currentPage();
     state.search = '';
     document.title = `${routeLabels[state.page].title} | أمواج للسياحة`;
-    if (state.page === 'dashboard') return renderDashboard();
-    if (collectionMeta[state.page]) return renderCollection(state.page);
-    if (state.page === 'pricing') return renderPricing();
-    if (state.page === 'blog') return renderBlog();
-    if (state.page === 'reviews') return renderReviews();
-    if (state.page === 'settings') return renderSettings();
-    return renderDashboard();
+    if (state.page === 'dashboard') await renderDashboard();
+    else if (collectionMeta[state.page]) await renderCollection(state.page);
+    else if (state.page === 'pricing') await renderPricing();
+    else if (state.page === 'blog') await renderBlog();
+    else if (state.page === 'reviews') await renderReviews();
+    else if (state.page === 'settings') await renderSettings();
+    else await renderDashboard();
+    syncMobileNavState(false);
+    applyTableAffordances();
   }
 
-  function closeMobileNav() {
+  function closeMobileNav({ restoreFocus = false } = {}) {
     document.getElementById('admin-sidebar')?.classList.remove('is-open');
     document.body.classList.remove('admin-nav-open');
+    syncMobileNavState(false);
+    if (restoreFocus && isCompactAdminViewport()) document.querySelector('[data-action="toggle-nav"]')?.focus({ preventScroll: true });
   }
 
   function toggleMobileNav() {
     const sidebar = document.getElementById('admin-sidebar');
-    if (!sidebar) return;
+    if (!sidebar || !isCompactAdminViewport()) return;
     const nextState = !sidebar.classList.contains('is-open');
     sidebar.classList.toggle('is-open', nextState);
     document.body.classList.toggle('admin-nav-open', nextState);
+    syncMobileNavState(nextState);
+    if (nextState) window.requestAnimationFrame(() => sidebar.querySelector('.nav-link.is-active, .nav-link')?.focus());
   }
 
   async function handleAction(event) {
@@ -885,5 +965,13 @@
   }
 
   document.addEventListener('click', (event) => { handleAction(event); });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && document.getElementById('admin-sidebar')?.classList.contains('is-open')) closeMobileNav({ restoreFocus: true });
+  });
+  window.addEventListener('resize', () => {
+    if (!isCompactAdminViewport()) closeMobileNav();
+    else syncMobileNavState(document.getElementById('admin-sidebar')?.classList.contains('is-open'));
+    applyTableAffordances();
+  }, { passive: true });
   initialize();
 }());
