@@ -1,4 +1,11 @@
 {
+  "redirects": [
+    {
+      "source": "/admin/reviews/",
+      "destination": "/admin/reviews",
+      "permanent": false
+    }
+  ],
   "rewrites": [
     {
       "source": "/admin/:path*",
