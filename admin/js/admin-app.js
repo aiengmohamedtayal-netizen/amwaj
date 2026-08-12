@@ -11,6 +11,7 @@
     services: { title: 'إدارة الخدمات', subtitle: 'إدارة الخدمات الداعمة لرحلة العميل.' },
     pricing: { title: 'جدول أسعار محرك البحث', subtitle: 'أدخل واعتمد عروض الرحلات الحية التي تظهر في محرك البحث العام.' },
     blog: { title: 'إدارة المدونة', subtitle: 'حرّر المقالات العربية والإنجليزية ثم راجعها وانشرها بأمان.' },
+    reviews: { title: 'آراء العملاء', subtitle: 'راجع آراء الزوار واعتمد الموثوق منها قبل ظهورها في الموقع العام.' },
     settings: { title: 'إعدادات الموقع', subtitle: 'مراجعة وتحديث الإعدادات المسجلة في مصدر البيانات المركزي.' }
   };
   const collectionMeta = {
@@ -86,7 +87,7 @@
     const links = [
       ['dashboard', 'fa-chart-pie', 'لوحة التحكم'], ['packages', 'fa-suitcase-rolling', 'البرامج'],
       ['destinations', 'fa-map-location-dot', 'الوجهات'], ['services', 'fa-concierge-bell', 'الخدمات'],
-      ['pricing', 'fa-tags', 'التسعير'], ['blog', 'fa-newspaper', 'المدونة'], ['settings', 'fa-sliders', 'الإعدادات']
+      ['pricing', 'fa-tags', 'التسعير'], ['blog', 'fa-newspaper', 'المدونة'], ['reviews', 'fa-star-half-stroke', 'آراء العملاء'], ['settings', 'fa-sliders', 'الإعدادات']
     ];
     return `<div class="admin-shell">
       <aside class="sidebar" id="admin-sidebar" aria-label="التنقل الإداري">
@@ -99,6 +100,7 @@
         <div class="sidebar-footer">
           <p class="user-name" title="${escapeHtml(profile.full_name || state.auth.session?.user?.email || '')}"><i class="fa-solid fa-user-shield" aria-hidden="true"></i> ${escapeHtml(profile.full_name || state.auth.session?.user?.email || 'مدير أمواج')}</p>
           <button class="btn btn-ghost btn-small" type="button" data-action="sign-out"><i class="fa-solid fa-right-from-bracket"></i> تسجيل الخروج</button>
+          <p class="developer-credit" dir="ltr">Developed by YOMNA ELHAMAMSY</p>
         </div>
       </aside>
       <section class="main-area">
@@ -554,6 +556,66 @@
     openDialog(`معاينة: ${subject.title_ar}`, 'هذه المعاينة تمثل البطاقة التي قد يراها العميل بعد نشر العرض.', `<article class="preview-card"><div class="preview-copy"><span class="badge badge-featured">${escapeHtml(offerDestination(item).title_ar)}</span><h4>${escapeHtml(subject.title_ar)}</h4><p>شهر السفر: ${escapeHtml(departureMonth(item.departure_month))} · ${escapeHtml(travelers)}</p><p class="preview-price">${escapeHtml(offerPriceText(item))}</p>${item.notes_ar ? `<p>${escapeHtml(item.notes_ar)}</p>` : ''}<div style="margin-top:1rem">${offerStatusMarkup(item)}</div></div></article>`, '<button class="btn" type="button" data-close-dialog>إغلاق</button>');
   }
 
+  function reviewStatusMarkup(review) {
+    const labels = {
+      pending: '<span class="badge badge-draft"><i class="fa-solid fa-hourglass-half"></i> قيد المراجعة</span>',
+      approved: '<span class="badge badge-published"><i class="fa-solid fa-circle-check"></i> معتمد</span>',
+      rejected: '<span class="badge badge-archived"><i class="fa-solid fa-circle-xmark"></i> مرفوض</span>'
+    };
+    return labels[review.status] || labels.pending;
+  }
+
+  function reviewStars(rating) {
+    const count = Math.max(1, Math.min(5, Number(rating) || 1));
+    return `<span class="review-admin-stars" aria-label="${count} من 5">${'<i class="fa-solid fa-star" aria-hidden="true"></i>'.repeat(count)}${'<i class="fa-regular fa-star" aria-hidden="true"></i>'.repeat(5 - count)}</span>`;
+  }
+
+  function reviewRows(reviews) {
+    if (!reviews.length) return '<div class="empty-state"><div><i class="fa-solid fa-comments"></i><h3>لا توجد آراء واردة</h3><p>ستظهر آراء الزوار المرسلة من الموقع العام هنا للمراجعة.</p></div></div>';
+    return `<div class="table-scroll"><table><thead><tr><th>العميل والرأي</th><th>التقييم</th><th>الحالة</th><th>تاريخ الإرسال</th><th><span class="sr-only">إجراءات</span></th></tr></thead><tbody>${reviews.map((review) => `<tr><td><strong>${escapeHtml(review.customer_name)}</strong><p class="review-admin-copy">${escapeHtml(review.review_text)}</p></td><td>${reviewStars(review.rating)}</td><td>${reviewStatusMarkup(review)}</td><td><span class="muted">${formatDate(review.submitted_at)}</span></td><td><div class="table-actions">${review.status !== 'approved' ? `<button class="btn btn-small" data-action="approve-review" data-id="${review.id}" aria-label="اعتماد الرأي"><i class="fa-solid fa-check"></i></button>` : ''}${review.status !== 'rejected' ? `<button class="btn btn-small" data-action="reject-review" data-id="${review.id}" aria-label="رفض الرأي"><i class="fa-solid fa-ban"></i></button>` : ''}<button class="btn btn-small btn-danger" data-action="delete-review" data-id="${review.id}" aria-label="حذف الرأي"><i class="fa-solid fa-trash"></i></button></div></td></tr>`).join('')}</tbody></table></div>`;
+  }
+
+  async function renderReviews() {
+    app.innerHTML = layout(`${pageHeader('آراء العملاء', 'الآراء الجديدة لا تظهر للعامة إلا بعد اعتمادها من هنا.')}${loadingMarkup('جارٍ تحميل آراء العملاء…')}`);
+    try {
+      const reviews = await client.list('customer_reviews', { order: 'submitted_at.desc' });
+      state.reviews = reviews;
+      const pending = reviews.filter((review) => review.status === 'pending').length;
+      const approved = reviews.filter((review) => review.status === 'approved').length;
+      const rejected = reviews.filter((review) => review.status === 'rejected').length;
+      const content = `${pageHeader('آراء العملاء', 'اعتمد الرأي الموثوق ليظهر في الموقع العام، أو ارفضه أو احذفه نهائيًا.', `<span class="badge badge-draft"><i class="fa-solid fa-hourglass-half"></i> ${pending} بانتظار المراجعة</span>`)}<section class="panel table-card"><div class="panel-head"><div><h3 class="panel-title">سجل مراجعات الزوار</h3><p class="panel-subtitle">يُعرض للعامة فقط ما يحمل حالة «معتمد».</p></div><div style="display:flex;gap:.45rem;flex-wrap:wrap"><span class="badge badge-published">${approved} معتمد</span><span class="badge badge-archived">${rejected} مرفوض</span></div></div><div class="toolbar"><div class="search-wrap"><i class="fa-solid fa-magnifying-glass"></i><input id="reviews-search" class="input" type="search" placeholder="ابحث بالاسم أو نص الرأي…"></div><span class="muted">${reviews.length} رأي</span></div><div id="reviews-table">${reviewRows(reviews)}</div></section>`;
+      app.innerHTML = layout(content);
+      document.getElementById('reviews-search')?.addEventListener('input', (event) => {
+        const term = event.target.value.toLowerCase().trim();
+        document.getElementById('reviews-table').innerHTML = reviewRows(reviews.filter((review) => `${review.customer_name} ${review.review_text}`.toLowerCase().includes(term)));
+      });
+    } catch (error) { app.innerHTML = layout(`${pageHeader('آراء العملاء', '')}${errorMarkup(error.message)}`); }
+  }
+
+  async function updateReviewStatus(id, status) {
+    const review = (state.reviews || []).find((item) => item.id === id);
+    if (!review) return;
+    const action = status === 'approved' ? 'اعتماد' : 'رفض';
+    const impact = status === 'approved' ? 'سيظهر هذا الرأي في الموقع العام فورًا.' : 'لن يظهر هذا الرأي في الموقع العام.';
+    if (!window.confirm(`هل تريد ${action} رأي «${review.customer_name}»؟\n${impact}`)) return;
+    try {
+      await client.update('customer_reviews', id, { status, reviewed_at: new Date().toISOString() });
+      showToast('success', status === 'approved' ? 'تم اعتماد الرأي' : 'تم رفض الرأي', impact);
+      await renderReviews();
+    } catch (error) { showToast('error', `تعذر ${action} الرأي`, error.message); }
+  }
+
+  async function deleteReview(id) {
+    const review = (state.reviews || []).find((item) => item.id === id);
+    if (!review) return;
+    if (!window.confirm(`هل تريد حذف رأي «${review.customer_name}» نهائيًا؟\nلا يمكن التراجع عن هذا الإجراء.`)) return;
+    try {
+      await client.remove('customer_reviews', id);
+      showToast('success', 'تم حذف الرأي', 'أُزيل الرأي من قائمة المراجعات والموقع العام إن كان معتمدًا.');
+      await renderReviews();
+    } catch (error) { showToast('error', 'تعذر حذف الرأي', error.message); }
+  }
+
   async function renderSettings() {
     app.innerHTML = layout(`${pageHeader('إعدادات الموقع', 'الإعدادات الحالية من Supabase فقط.')}${loadingMarkup('جارٍ تحميل الإعدادات…')}`);
     try {
@@ -753,6 +815,7 @@
     if (collectionMeta[state.page]) return renderCollection(state.page);
     if (state.page === 'pricing') return renderPricing();
     if (state.page === 'blog') return renderBlog();
+    if (state.page === 'reviews') return renderReviews();
     if (state.page === 'settings') return renderSettings();
     return renderDashboard();
   }
@@ -792,6 +855,9 @@
     if (action === 'save-blog-category') saveBlogCategory(target);
     if (action === 'toggle-blog-category') toggleBlogCategory(target.dataset.id);
     if (action === 'delete-blog-category') deleteBlogCategory(target.dataset.id);
+    if (action === 'approve-review') updateReviewStatus(target.dataset.id, 'approved');
+    if (action === 'reject-review') updateReviewStatus(target.dataset.id, 'rejected');
+    if (action === 'delete-review') deleteReview(target.dataset.id);
     if (action === 'close-dialog') target.closest('dialog')?.close();
   }
 

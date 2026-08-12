@@ -1043,10 +1043,10 @@
                     <h2 class="text-3xl font-extrabold text-slate-900 dark:text-white lang-ar">ماذا يقول مسافرونا</h2>
                 </div>
 
-                <div class="grid md:grid-cols-3 gap-8 items-stretch">
+                <div id="testimonialCards" class="grid md:grid-cols-3 gap-8 items-stretch">
                     <div class="surface-layer p-6 space-y-4 flex flex-col justify-between h-full reveal">
                         <div class="space-y-3">
-                            <div class="flex text-goldAccent-500 text-xs gap-1"><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i></div>
+                            <div class="flex text-goldAccent-500 text-xs gap-1" aria-label="5 out of 5 stars"><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i></div>
                             <p class="text-xs text-slate-600 dark:text-slate-300 italic leading-relaxed lang-en">"Amwaj Travel organized our honeymoon trip to the Maldives & Dubai. Everything was top notch!"</p>
                             <p class="text-xs text-slate-600 dark:text-slate-300 italic leading-relaxed lang-ar">"شركة أمواج للسياحة نظمت لنا رحلة شهر العسل للمالديف ودبي. كل حاجة كانت ممتازة جداً والتنظيم فوق الرائع!"</p>
                         </div>
@@ -1055,7 +1055,7 @@
 
                     <div class="surface-layer p-6 space-y-4 flex flex-col justify-between h-full reveal reveal-d1">
                         <div class="space-y-3">
-                            <div class="flex text-goldAccent-500 text-xs gap-1"><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i></div>
+                            <div class="flex text-goldAccent-500 text-xs gap-1" aria-label="5 out of 5 stars"><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i></div>
                             <p class="text-xs text-slate-600 dark:text-slate-300 italic leading-relaxed lang-en">"5-Star VIP Hajj & Umrah with Amwaj was exceptional. Hotel steps away from Haram."</p>
                             <p class="text-xs text-slate-600 dark:text-slate-300 italic leading-relaxed lang-ar">"رحلة الحج والعمرة مع أمواج للسياحة كانت ممتازة جداً. الفندق كان قريب جداً من الحرم في مكة والإشراف تام."</p>
                         </div>
@@ -1064,12 +1064,59 @@
 
                     <div class="surface-layer p-6 space-y-4 flex flex-col justify-between h-full reveal reveal-d2">
                         <div class="space-y-3">
-                            <div class="flex text-goldAccent-500 text-xs gap-1"><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i></div>
+                            <div class="flex text-goldAccent-500 text-xs gap-1" aria-label="5 out of 5 stars"><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i></div>
                             <p class="text-xs text-slate-600 dark:text-slate-300 italic leading-relaxed lang-en">"We booked our family vacation to Turkey with Amwaj. Best travel agency in Kafr El Sheikh!"</p>
                             <p class="text-xs text-slate-600 dark:text-slate-300 italic leading-relaxed lang-ar">"حجزنا رحلتنا العائلية لتركيا مع شركة أمواج. أفضل شركة سياحة بكفر الشيخ ومصداقية 100%."</p>
                         </div>
                         <h4 class="text-xs font-bold text-slate-900 dark:text-white pt-2 border-t border-slate-100 dark:border-slate-800">المهندسة سارة أ. / Eng. Sarah</h4>
                     </div>
+                    <div id="approvedReviewsGrid" class="contents" aria-live="polite"></div>
+                </div>
+
+                <div class="text-center reveal">
+                    <button id="openReviewForm" type="button" aria-expanded="false" aria-controls="reviewFormPanel" class="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-xs font-extrabold shadow-md transition-all btn-magnetic">
+                        <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i><span class="lang-en">Add Your Review</span><span class="lang-ar">أضف رأيك</span>
+                    </button>
+                </div>
+
+                <div id="reviewFormPanel" hidden class="max-w-2xl mx-auto surface-layer p-6 sm:p-8 reveal">
+                    <div class="flex items-start justify-between gap-4 mb-6">
+                        <div>
+                            <h3 class="text-lg font-extrabold text-slate-900 dark:text-white lang-en">Share your travel experience</h3>
+                            <h3 class="text-lg font-extrabold text-slate-900 dark:text-white lang-ar">شاركنا تجربتك في السفر</h3>
+                            <p class="text-xs text-slate-500 dark:text-slate-400 mt-1 lang-en">Your review is reviewed by Amwaj before it appears publicly.</p>
+                            <p class="text-xs text-slate-500 dark:text-slate-400 mt-1 lang-ar">يراجع فريق أمواج رأيك قبل ظهوره للزوار.</p>
+                        </div>
+                        <button id="closeReviewForm" type="button" class="w-9 h-9 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-brand-500 hover:border-brand-300" aria-label="إغلاق نموذج الرأي"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+                    </div>
+                    <form id="reviewForm" novalidate class="space-y-4">
+                        <div class="grid sm:grid-cols-[1fr_auto] gap-4">
+                            <div>
+                                <label for="reviewCustomerName" class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5"><span class="lang-en">Your name</span><span class="lang-ar">الاسم</span></label>
+                                <input id="reviewCustomerName" name="customer_name" type="text" minlength="2" maxlength="90" required data-ph-ar="اكتب اسمك كما تريد ظهوره" data-ph-en="Enter the name you want to display" class="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-brand-900 text-slate-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-brand-500">
+                            </div>
+                            <div>
+                                <label for="reviewRating" class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5"><span class="lang-en">Rating</span><span class="lang-ar">التقييم</span></label>
+                                <select id="reviewRating" name="rating" required class="w-full min-w-32 px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-brand-900 text-slate-900 dark:text-white text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-500">
+                                    <option value="" selected disabled>★★★★★</option>
+                                    <option value="5">★★★★★ — 5/5</option>
+                                    <option value="4">★★★★☆ — 4/5</option>
+                                    <option value="3">★★★☆☆ — 3/5</option>
+                                    <option value="2">★★☆☆☆ — 2/5</option>
+                                    <option value="1">★☆☆☆☆ — 1/5</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div>
+                            <label for="reviewText" class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5"><span class="lang-en">Your review</span><span class="lang-ar">رأيك</span></label>
+                            <textarea id="reviewText" name="review_text" minlength="10" maxlength="1200" rows="5" required data-ph-ar="اكتب تفاصيل تجربتك مع أمواج..." data-ph-en="Tell us about your experience with Amwaj..." class="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-brand-900 text-slate-900 dark:text-white text-xs leading-relaxed resize-y focus:outline-none focus:ring-2 focus:ring-brand-500"></textarea>
+                        </div>
+                        <div class="absolute -left-[10000px] top-auto w-px h-px overflow-hidden" aria-hidden="true">
+                            <label for="reviewCompanyWebsite">Website</label><input id="reviewCompanyWebsite" name="company_website" type="text" tabindex="-1" autocomplete="off">
+                        </div>
+                        <button type="submit" class="w-full py-3 rounded-xl bg-gradient-to-r from-brand-500 to-tealCustom-500 text-white font-bold text-xs shadow-md btn-magnetic"><i class="fa-solid fa-paper-plane mr-1" aria-hidden="true"></i><span class="lang-en">Send for Review</span><span class="lang-ar">إرسال للمراجعة</span></button>
+                    </form>
+                    <p id="reviewFormStatus" hidden role="status" aria-live="polite"></p>
                 </div>
             </div>
         </section>
@@ -1434,6 +1481,7 @@
     <script src="js/i18n.js"></script>
     <script src="js/booking-engine.js"></script>
     <script src="js/public-content.js"></script>
+    <script src="js/customer-reviews.js"></script>
     <script src="js/ai-agent.js"></script>
     <script src="js/app.js"></script>
 </body>

@@ -27,6 +27,7 @@ a { color: inherit; }
 .nav-icon { width: 1.3rem; text-align: center; color: var(--color-gold); }
 .sidebar-footer { margin-top: 1.2rem; padding: 1rem .7rem 0; border-top: 1px solid rgba(255,255,255,.1); }
 .user-name { margin: 0 0 .7rem; color: #9bcfe2; font-size: .78rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.developer-credit { margin: .85rem 0 0; color: rgba(190,225,238,.5); font: 600 .58rem/1.45 var(--font-english); letter-spacing: .04em; text-align: center; }
 
 .main-area { min-width: 0; }
 .topbar { min-height: 4.75rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .75rem clamp(1rem, 3vw, 2.5rem); background: rgba(255,255,255,.79); border-bottom: 1px solid rgba(15,23,42,.08); backdrop-filter: blur(16px) saturate(150%); position: sticky; top: 0; z-index: 20; }
@@ -42,6 +43,9 @@ a { color: inherit; }
 .btn-primary { color: #fff; background: linear-gradient(115deg, var(--color-primary), var(--color-secondary)); border-color: transparent; }
 .btn-primary:hover { color: #fff; box-shadow: var(--shadow-glow); }
 .btn-danger { color: #b42318; background: #fff7f6; border-color: #ffd4d0; }
+.review-admin-stars { display: inline-flex; gap: .14rem; color: var(--color-gold); white-space: nowrap; }
+.review-admin-stars .fa-regular { color: #cbd5e1; }
+.review-admin-copy { max-width: 34rem; margin: .35rem 0 0; color: var(--color-text-slate); font-size: .82rem; line-height: 1.7; white-space: pre-line; }
 .btn-ghost { color: #eefaff; background: transparent; border-color: rgba(255,255,255,.18); box-shadow: none; }
 .btn-ghost:hover { color: #fff; background: rgba(255,255,255,.1); border-color: rgba(255,255,255,.36); }
 .btn-small { min-height: 2.3rem; padding: .48rem .7rem; font-size: .78rem; }
