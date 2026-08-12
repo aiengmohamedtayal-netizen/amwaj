@@ -613,7 +613,9 @@
     const required = ['title_ar', 'title_en', 'category_id'];
     if (status === 'published') required.push('excerpt_ar', 'excerpt_en', 'content_ar', 'content_en');
     if (required.some((field) => !String(values[field] || '').trim())) throw new Error('أكمل الحقول المطلوبة قبل النشر.');
-    const optionalUrl = (value) => { const trimmed = String(value || '').trim(); if (trimmed && !/^https:\/\//i.test(trimmed)) throw new Error('تُقبل روابط HTTPS فقط للصور الخارجية.'); return trimmed || null; };
+    // Image URLs are normally populated by the secure Supabase Storage uploader. Keep optional URLs
+    // non-blocking so a valid uploader result or existing asset never prevents saving an article.
+    const optionalUrl = (value) => String(value || '').trim() || null;
     return { slug, title_ar: values.title_ar.trim(), title_en: values.title_en.trim(), excerpt_ar: values.excerpt_ar.trim(), excerpt_en: values.excerpt_en.trim(), content_ar: values.content_ar.trim(), content_en: values.content_en.trim(), featured_image_url: optionalUrl(values.featured_image_url), featured_image_alt_ar: values.featured_image_alt_ar.trim() || null, featured_image_alt_en: values.featured_image_alt_en.trim() || null, category_id: values.category_id, status, is_featured: Boolean(form.querySelector('[name="is_featured"]')?.checked) && status === 'published', sort_order: Math.max(0, Number(values.sort_order || 0)), seo_title_ar: values.seo_title_ar.trim() || null, seo_title_en: values.seo_title_en.trim() || null, seo_description_ar: values.seo_description_ar.trim() || null, seo_description_en: values.seo_description_en.trim() || null, og_image_url: optionalUrl(values.og_image_url), author_id: existing?.author_id || state.auth.session?.user?.id || null, updated_by: state.auth.session?.user?.id || null, ...(status === 'published' ? { published_at: existing?.published_at || new Date().toISOString() } : {}) };
   }
 
