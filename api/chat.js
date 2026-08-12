@@ -53,27 +53,30 @@ export default async function handler(req, res) {
         const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
         const { messages, tools, model, stream = true } = body;
 
-        // Keys resolution strictly from Environment Variables
-        const tokenRouterKey = (process.env.TOKENROUTER_API_KEY || process.env.KIMI_API_KEY || '').trim();
+        // Prefer Groq whenever its server-side key is configured. A legacy TokenRouter
+        // variable may still be present in Vercel, but must never override the approved
+        // Groq integration or route requests to an unavailable Kimi model.
         const groqKey = (process.env.GROQ_API_KEY || '').trim();
-        const apiKey = tokenRouterKey || groqKey;
+        const tokenRouterKey = (process.env.TOKENROUTER_API_KEY || process.env.KIMI_API_KEY || '').trim();
+        const useGroq = Boolean(groqKey);
+        const apiKey = groqKey || tokenRouterKey;
 
         if (!apiKey) {
-            console.error('[CONFIG_ERROR] No TOKENROUTER_API_KEY or GROQ_API_KEY found in process.env');
+            console.error('[CONFIG_ERROR] No GROQ_API_KEY or fallback provider key found in process.env');
             return res.status(500).json({
                 error: 'AI provider is not configured.',
                 message: 'The AI assistant is temporarily unconfigured on the server.'
             });
         }
 
-        const isTokenRouter = !!tokenRouterKey;
-        const endpointUrl = isTokenRouter 
+        const isTokenRouter = !useGroq && Boolean(tokenRouterKey);
+        const endpointUrl = isTokenRouter
             ? 'https://api.tokenrouter.com/v1/chat/completions'
             : 'https://api.groq.com/openai/v1/chat/completions';
 
-        const targetModel = isTokenRouter 
+        const targetModel = isTokenRouter
             ? (model || 'moonshotai/kimi-k3-free')
-            : (model && model.includes('llama') ? model : 'llama-3.3-70b-versatile');
+            : (model && /^llama-(3\.1|3\.3)-/i.test(model) ? model : 'llama-3.3-70b-versatile');
 
         const payload = {
             model: targetModel,
