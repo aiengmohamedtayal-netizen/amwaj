@@ -61,12 +61,28 @@ function closeLightbox() {
 /* =====================================================================
    MOBILE MENU
    ===================================================================== */
-function toggleMobileMenu() {
+function setMobileMenuState(open) {
     const menu = document.getElementById('mobileMenu');
     const btn  = document.getElementById('mobileMenuBtn');
     if (!menu) return;
-    const isHidden = menu.classList.toggle('hidden');
-    if (btn) btn.setAttribute('aria-expanded', String(!isHidden));
+
+    menu.classList.toggle('hidden', !open);
+    document.documentElement.classList.toggle('mobile-nav-open', open);
+    if (btn) {
+        btn.setAttribute('aria-expanded', String(open));
+        btn.querySelector('i')?.classList.toggle('fa-bars', !open);
+        btn.querySelector('i')?.classList.toggle('fa-xmark', open);
+    }
+}
+
+function toggleMobileMenu() {
+    const menu = document.getElementById('mobileMenu');
+    if (!menu) return;
+    setMobileMenuState(menu.classList.contains('hidden'));
+}
+
+function closeMobileMenu() {
+    setMobileMenuState(false);
 }
 
 /* =====================================================================
@@ -224,7 +240,7 @@ function downloadPortfolioFile() {
    SCROLL REVEAL SYSTEM — IntersectionObserver
    ===================================================================== */
 function initScrollReveal() {
-    if (!('IntersectionObserver' in window)) {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || !('IntersectionObserver' in window)) {
         document.querySelectorAll('.reveal').forEach(el => el.classList.add('in-view'));
         return;
     }
@@ -292,7 +308,9 @@ function initScrollPhysics() {
    MOUSE SPOTLIGHT & 3D CARD TILT PHYSICS (60 FPS)
    ===================================================================== */
 function initMousePhysics() {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const finePointer = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+    if (reducedMotion || !finePointer) return;
 
     const cards = document.querySelectorAll('.surface-layer, .travel-card-hover');
 
@@ -335,7 +353,19 @@ function initMousePhysics() {
    ===================================================================== */
 function initAnimatedCounters() {
     const counterElements = document.querySelectorAll('[data-counter]');
-    if (!counterElements.length || !('IntersectionObserver' in window)) return;
+    if (!counterElements.length) return;
+
+    const setCounterValue = el => {
+        const targetNum = parseInt(el.getAttribute('data-counter'), 10);
+        const prefix = el.getAttribute('data-prefix') || '';
+        const suffix = el.getAttribute('data-suffix') || '';
+        if (!isNaN(targetNum)) el.textContent = `${prefix}${targetNum.toLocaleString()}${suffix}`;
+    };
+
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || !('IntersectionObserver' in window)) {
+        counterElements.forEach(setCounterValue);
+        return;
+    }
 
     const observer = new IntersectionObserver(entries => {
         entries.forEach(entry => {
@@ -403,9 +433,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const menuBtn = document.getElementById('mobileMenuBtn');
     if (menuBtn) menuBtn.addEventListener('click', toggleMobileMenu);
 
+    const mobileMenu = document.getElementById('mobileMenu');
+    mobileMenu?.querySelectorAll('a').forEach(link => {
+        link.addEventListener('click', closeMobileMenu);
+    });
+    window.matchMedia('(min-width: 1024px)').addEventListener('change', event => {
+        if (event.matches) closeMobileMenu();
+    });
+
     /* --- Escape Key: close modals ------------------------------- */
     document.addEventListener('keydown', e => {
         if (e.key !== 'Escape') return;
+        closeMobileMenu();
         closeLightbox();
         if (typeof closeBookingModal === 'function') closeBookingModal();
         const drawer = document.getElementById('aiDrawer');

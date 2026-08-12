@@ -79,3 +79,27 @@
 @media (max-width: 860px) { .blog-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } .blog-brand-subtitle { display:none; } }
 @media (max-width: 580px) { .blog-container { width:min(100% - 1.25rem,1180px); } .blog-header-inner { min-height:4.6rem; } .blog-brand img { width:44px; } .blog-brand-name { font-size:.88rem; } .blog-nav { gap:.3rem; }.blog-nav-link, .blog-control { padding:.55rem .65rem; }.blog-nav-link .blog-hide-small { display:none; }.blog-grid { grid-template-columns:1fr; gap:1rem; }.blog-title { font-size:2rem; }.blog-toolbar { align-items:flex-start; flex-direction:column; }.blog-article { margin-top:.8rem; }.blog-prose { font-size:1rem; } }
 @media print { .blog-header, .blog-footer, .blog-related, .blog-hide-print { display:none !important; } .blog-shell { background:#fff !important; color:#000 !important; } .blog-article { width:100%; max-width:none; }.blog-prose { font-size:12pt; line-height:1.7; } }
+
+
+/* Responsive content safeguards for posts created in the admin editor. */
+.blog-prose { overflow-wrap: anywhere; }
+.blog-prose img, .blog-prose video, .blog-prose iframe { display: block; max-width: 100%; height: auto; border-radius: .85rem; }
+.blog-prose pre { max-width: 100%; overflow-x: auto; padding: 1rem; border-radius: .75rem; background: rgba(0,153,216,.07); }
+.blog-prose table { display: block; width: max-content; min-width: 100%; max-width: 100%; overflow-x: auto; border-collapse: collapse; }
+.blog-prose th, .blog-prose td { padding: .65rem .75rem; border: 1px solid var(--blog-border); vertical-align: top; }
+
+@media (max-width: 580px) {
+  .blog-header-inner { gap: .65rem; }
+  .blog-brand { flex: 1 1 auto; }
+  .blog-nav { flex: 0 0 auto; }
+  .blog-control, .blog-nav-link, .blog-button { min-height: 42px; }
+  .blog-article-hero { margin-inline: 0; border-radius: 1rem; }
+  .blog-prose blockquote { padding: .9rem 1rem; margin-inline: 0; }
+  .blog-prose table { font-size: .88rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .blog-card, .blog-button, .blog-nav-link, .blog-control { transition: none !important; }
+  .blog-card:hover, .blog-button:hover { transform: none !important; }
+  .blog-skeleton { animation: none !important; }
+}

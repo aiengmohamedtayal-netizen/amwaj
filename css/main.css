@@ -336,3 +336,86 @@ h1, h2, h3 { text-wrap: balance; }
         background: #081826 !important;
     }
 }
+
+/* ---- Responsive Integrity Layer ----
+   Keeps dynamic content, embedded media and form controls inside the viewport. */
+html { overflow-x: clip; }
+body { min-width: 320px; overflow-x: clip; }
+img, svg, video, canvas, iframe { max-width: 100%; }
+input, select, textarea, button { min-width: 0; }
+textarea { resize: vertical; }
+
+/* Horizontal data regions remain operable rather than breaking their container. */
+.overflow-x-auto, .table-scroll-region {
+    max-width: 100%;
+    overscroll-behavior-inline: contain;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Touch devices do not retain desktop hover states after a tap. */
+@media (hover: none), (pointer: coarse) {
+    .surface-layer:hover,
+    .travel-card-hover:hover,
+    .btn-magnetic:hover {
+        transform: none;
+    }
+    .surface-layer:hover::before { opacity: 0; }
+}
+
+/* Mobile navigation behaves as a contained drawer and never leaves the page
+   scrollable behind it. */
+@media (max-width: 1023px) {
+    html.mobile-nav-open,
+    html.mobile-nav-open body { overflow: hidden; }
+
+    #mobileMenu {
+        max-height: calc(100dvh - 5.25rem);
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        box-shadow: 0 18px 34px rgba(8, 24, 38, 0.12);
+    }
+    #mobileMenu a {
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+        border-radius: 0.75rem;
+        padding-inline: 0.75rem;
+    }
+
+    /* The AI drawer keeps safe spacing from both device edges and browser UI. */
+    #aiDrawer {
+        width: auto !important;
+        inset-inline: max(0.75rem, env(safe-area-inset-right)) !important;
+        bottom: max(0.75rem, env(safe-area-inset-bottom)) !important;
+        max-height: min(76dvh, 42rem);
+    }
+}
+
+@media (max-width: 639px) {
+    .trust-icon-strip { gap: 0.5rem; }
+    .trust-badge { font-size: 0.625rem; padding: 0.34rem 0.62rem; }
+
+    /* Floating actions remain reachable without covering each other. */
+    .floating-whatsapp, .floating-ai {
+        bottom: max(1rem, env(safe-area-inset-bottom)) !important;
+    }
+    .floating-whatsapp { inset-inline-end: 1rem !important; }
+    .floating-ai { inset-inline-start: 1rem !important; }
+
+    /* Modal surfaces use the available viewport height on compact phones. */
+    #bookingModal > div, #lightboxModal > div {
+        max-height: calc(100dvh - 1.5rem);
+        overflow-y: auto;
+        overscroll-behavior: contain;
+    }
+}
+
+@media (min-width: 640px) and (max-width: 1023px) {
+    #aiDrawer { max-width: min(30rem, calc(100vw - 2rem)); }
+}
+
+/* Keep non-essential visual motion light on compact or touch-only devices. */
+@media (max-width: 639px), (hover: none) {
+    .animate-orb-a, .animate-orb-b { animation-duration: 32s; }
+    .surface-layer, .travel-card-hover { will-change: auto; }
+}

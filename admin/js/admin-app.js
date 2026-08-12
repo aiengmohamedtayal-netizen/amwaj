@@ -91,11 +91,11 @@
     ];
     return `<div class="admin-shell">
       <aside class="sidebar" id="admin-sidebar" aria-label="التنقل الإداري">
-        <a class="brand" href="/admin/" aria-label="لوحة تحكم أمواج">
+        <a class="brand" href="/admin/" data-action="navigate" aria-label="لوحة تحكم أمواج">
           <img src="/assets/logo.png" alt="شعار أمواج للسياحة"><span><strong>أمواج للسياحة</strong><small>AMWAJ ADMIN</small></span>
         </a>
         <nav class="nav-group" aria-label="أقسام الإدارة"><span class="nav-title">القائمة الرئيسية</span>
-          ${links.map(([key, icon, label]) => `<a class="nav-link ${state.page === key ? 'is-active' : ''}" href="${adminPath(key)}" ${state.page === key ? 'aria-current="page"' : ''}><i class="nav-icon fa-solid ${icon}" aria-hidden="true"></i><span>${label}</span></a>`).join('')}
+          ${links.map(([key, icon, label]) => `<a class="nav-link ${state.page === key ? 'is-active' : ''}" href="${adminPath(key)}" data-action="navigate" ${state.page === key ? 'aria-current="page"' : ''}><i class="nav-icon fa-solid ${icon}" aria-hidden="true"></i><span>${label}</span></a>`).join('')}
         </nav>
         <div class="sidebar-footer">
           <p class="user-name" title="${escapeHtml(profile.full_name || state.auth.session?.user?.email || '')}"><i class="fa-solid fa-user-shield" aria-hidden="true"></i> ${escapeHtml(profile.full_name || state.auth.session?.user?.email || 'مدير أمواج')}</p>
@@ -103,6 +103,7 @@
           <p class="developer-credit" dir="ltr">Developed by YOMNA ELHAMAMSY</p>
         </div>
       </aside>
+      <button class="sidebar-backdrop" type="button" data-action="close-nav" aria-label="إغلاق القائمة الجانبية"></button>
       <section class="main-area">
         <header class="topbar">
           <div class="topbar-label"><button class="btn icon-btn mobile-nav-toggle" type="button" data-action="toggle-nav" aria-label="فتح القائمة"><i class="fa-solid fa-bars"></i></button><div><h1>${escapeHtml(pageLabel.title)}</h1><p>${escapeHtml(pageLabel.subtitle)}</p></div></div>
@@ -808,6 +809,7 @@
   }
 
   async function renderPage() {
+    closeMobileNav();
     state.page = currentPage();
     state.search = '';
     document.title = `${routeLabels[state.page].title} | أمواج للسياحة`;
@@ -820,11 +822,25 @@
     return renderDashboard();
   }
 
+  function closeMobileNav() {
+    document.getElementById('admin-sidebar')?.classList.remove('is-open');
+    document.body.classList.remove('admin-nav-open');
+  }
+
+  function toggleMobileNav() {
+    const sidebar = document.getElementById('admin-sidebar');
+    if (!sidebar) return;
+    const nextState = !sidebar.classList.contains('is-open');
+    sidebar.classList.toggle('is-open', nextState);
+    document.body.classList.toggle('admin-nav-open', nextState);
+  }
+
   async function handleAction(event) {
     const target = event.target.closest('[data-action]');
     if (!target) return;
     const action = target.dataset.action;
-    if (action === 'toggle-nav') document.getElementById('admin-sidebar')?.classList.toggle('is-open');
+    if (action === 'toggle-nav') toggleMobileNav();
+    if (action === 'close-nav' || action === 'navigate') closeMobileNav();
     if (action === 'reload-page') renderPage();
     if (action === 'export-pdf') { window.print(); }
     if (action === 'sign-out') { await client.signOut(); window.location.replace('/admin/login/'); }
