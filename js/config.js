@@ -45,5 +45,9 @@ window.AMWAJ_CONFIG = {
     },
     ai: {
         apiEndpoint: "/api/chat"
+    },
+    supabase: {
+        url: "https://wufguxedvhqechlqwoye.supabase.co",
+        publishableKey: "sb_publishable__IM9SxvJHCrIh9HUsnkn5w_CerIzlPf"
     }
 };
