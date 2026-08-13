@@ -444,11 +444,12 @@ textarea { resize: vertical; }
         z-index: 61;
         top: calc(4.75rem + env(safe-area-inset-top));
         right: 0;
-        bottom: 0;
+        bottom: auto;
         left: 0;
         width: 100%;
-        height: auto;
-        max-height: none;
+        height: calc(100dvh - 4.75rem - env(safe-area-inset-top));
+        min-height: calc(100dvh - 4.75rem - env(safe-area-inset-top));
+        max-height: calc(100dvh - 4.75rem - env(safe-area-inset-top));
         margin: 0;
         padding: 0.25rem 1rem max(1.25rem, env(safe-area-inset-bottom));
         overflow-y: auto;
@@ -529,7 +530,9 @@ textarea { resize: vertical; }
     #mobileMenu {
         top: calc(4.75rem + env(safe-area-inset-top));
         width: 100%;
-        max-height: none;
+        height: calc(100dvh - 4.75rem - env(safe-area-inset-top));
+        min-height: calc(100dvh - 4.75rem - env(safe-area-inset-top));
+        max-height: calc(100dvh - 4.75rem - env(safe-area-inset-top));
     }
 
     .floating-ai {
