@@ -61,17 +61,27 @@ function closeLightbox() {
 /* =====================================================================
    MOBILE MENU
    ===================================================================== */
-function setMobileMenuState(open) {
+function setMobileMenuState(open, { restoreFocus = false } = {}) {
     const menu = document.getElementById('mobileMenu');
-    const btn  = document.getElementById('mobileMenuBtn');
+    const btn = document.getElementById('mobileMenuBtn');
+    const backdrop = document.getElementById('mobileMenuBackdrop');
     if (!menu) return;
 
     menu.classList.toggle('hidden', !open);
+    menu.setAttribute('aria-hidden', String(!open));
+    backdrop?.classList.toggle('hidden', !open);
     document.documentElement.classList.toggle('mobile-nav-open', open);
+
     if (btn) {
         btn.setAttribute('aria-expanded', String(open));
         btn.querySelector('i')?.classList.toggle('fa-bars', !open);
         btn.querySelector('i')?.classList.toggle('fa-xmark', open);
+    }
+
+    if (open) {
+        window.setTimeout(() => menu.focus({ preventScroll: true }), 0);
+    } else if (restoreFocus) {
+        btn?.focus({ preventScroll: true });
     }
 }
 
@@ -81,8 +91,8 @@ function toggleMobileMenu() {
     setMobileMenuState(menu.classList.contains('hidden'));
 }
 
-function closeMobileMenu() {
-    setMobileMenuState(false);
+function closeMobileMenu(options = {}) {
+    setMobileMenuState(false, options);
 }
 
 /* =====================================================================
@@ -417,26 +427,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /* --- Theme ---------------------------------------------------- */
     const themeBtn = document.getElementById('themeToggle');
-    if (themeBtn) {
-        const prefersDark = !('theme' in localStorage)
-            ? window.matchMedia('(prefers-color-scheme: dark)').matches
-            : localStorage.theme === 'dark';
-        document.documentElement.classList.toggle('dark', prefersDark);
+    const mobileThemeBtn = document.getElementById('mobileThemeToggle');
+    const prefersDark = !('theme' in localStorage)
+        ? window.matchMedia('(prefers-color-scheme: dark)').matches
+        : localStorage.theme === 'dark';
+    document.documentElement.classList.toggle('dark', prefersDark);
 
-        themeBtn.addEventListener('click', () => {
-            const isDark = document.documentElement.classList.toggle('dark');
-            localStorage.theme = isDark ? 'dark' : 'light';
-        });
-    }
+    const toggleTheme = () => {
+        const isDark = document.documentElement.classList.toggle('dark');
+        localStorage.theme = isDark ? 'dark' : 'light';
+    };
+    themeBtn?.addEventListener('click', toggleTheme);
+    mobileThemeBtn?.addEventListener('click', toggleTheme);
 
     /* --- Mobile Menu -------------------------------------------- */
     const menuBtn = document.getElementById('mobileMenuBtn');
     if (menuBtn) menuBtn.addEventListener('click', toggleMobileMenu);
 
     const mobileMenu = document.getElementById('mobileMenu');
+    const mobileMenuBackdrop = document.getElementById('mobileMenuBackdrop');
     mobileMenu?.querySelectorAll('a').forEach(link => {
-        link.addEventListener('click', closeMobileMenu);
+        link.addEventListener('click', () => closeMobileMenu());
     });
+    mobileMenuBackdrop?.addEventListener('click', () => closeMobileMenu({ restoreFocus: true }));
     window.matchMedia('(min-width: 1024px)').addEventListener('change', event => {
         if (event.matches) closeMobileMenu();
     });
@@ -444,7 +457,7 @@ document.addEventListener('DOMContentLoaded', () => {
     /* --- Escape Key: close modals ------------------------------- */
     document.addEventListener('keydown', e => {
         if (e.key !== 'Escape') return;
-        closeMobileMenu();
+        closeMobileMenu({ restoreFocus: true });
         closeLightbox();
         if (typeof closeBookingModal === 'function') closeBookingModal();
         const drawer = document.getElementById('aiDrawer');
