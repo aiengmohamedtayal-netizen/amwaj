@@ -426,9 +426,8 @@ textarea { resize: vertical; }
     inset: 0;
     z-index: 45;
     border: 0;
-    background: rgba(8, 24, 38, 0.46);
-    backdrop-filter: blur(2px);
-    -webkit-backdrop-filter: blur(2px);
+    /* Keep context visible without making the drawer or page text visually blurry. */
+    background: rgba(8, 24, 38, 0.38);
 }
 
 @media (max-width: 1023px) {
