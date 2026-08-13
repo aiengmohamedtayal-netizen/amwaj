@@ -431,11 +431,20 @@ textarea { resize: vertical; }
 }
 
 @media (max-width: 1023px) {
-    #siteHeader { isolation: isolate; }
+    /* The drawer must sit above the page overlay so its content is never dimmed. */
+    #siteHeader {
+        isolation: isolate;
+        position: relative;
+        z-index: 60;
+    }
 
     #mobileMenu {
         position: fixed;
-        z-index: 50;
+        z-index: 61;
+        background: #ffffff !important;
+        color: #1e293b;
+        opacity: 1;
+        filter: none;
         top: calc(5rem + env(safe-area-inset-top));
         inset-inline: 0;
         width: min(25rem, calc(100vw - 1.25rem));
@@ -445,8 +454,14 @@ textarea { resize: vertical; }
         border: 1px solid rgba(148, 163, 184, 0.28);
         border-radius: 1.25rem;
         box-shadow: 0 1.5rem 3.5rem rgba(8, 24, 38, 0.24);
+        overflow-y: auto;
         overscroll-behavior: contain;
         animation: mobile-drawer-enter 180ms cubic-bezier(0.23, 1, 0.32, 1);
+    }
+
+    .dark #mobileMenu {
+        background: #0f2537 !important;
+        color: #e2e8f0;
     }
 
     #mobileMenu a,
@@ -459,8 +474,22 @@ textarea { resize: vertical; }
         transition: background-color 160ms cubic-bezier(0.23, 1, 0.32, 1), color 160ms cubic-bezier(0.23, 1, 0.32, 1);
     }
 
+    #mobileMenu a + a,
+    #mobileMenu button {
+        border-top: 1px solid rgba(148, 163, 184, 0.18);
+    }
+
     #mobileMenu a:active,
     #mobileThemeToggle:active { transform: scale(0.985); }
+
+    #about,
+    #destinations,
+    #packages,
+    #services,
+    #ai-hub,
+    #contact {
+        scroll-margin-top: calc(6rem + env(safe-area-inset-top));
+    }
 
     #mobileMenu a:hover,
     #mobileMenu a:focus-visible,

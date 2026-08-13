@@ -446,7 +446,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const mobileMenu = document.getElementById('mobileMenu');
     const mobileMenuBackdrop = document.getElementById('mobileMenuBackdrop');
-    mobileMenu?.querySelectorAll('a').forEach(link => {
+    mobileMenu?.querySelectorAll('a[href^="#"]').forEach(link => {
+        link.addEventListener('click', event => {
+            const targetId = link.getAttribute('href');
+            const target = targetId ? document.querySelector(targetId) : null;
+            if (!target) return;
+
+            event.preventDefault();
+            closeMobileMenu();
+            window.setTimeout(() => {
+                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                window.history.replaceState(null, '', targetId);
+            }, 0);
+        });
+    });
+
+    mobileMenu?.querySelectorAll('a:not([href^="#"])').forEach(link => {
         link.addEventListener('click', () => closeMobileMenu());
     });
     mobileMenuBackdrop?.addEventListener('click', () => closeMobileMenu({ restoreFocus: true }));
