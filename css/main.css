@@ -438,45 +438,52 @@ textarea { resize: vertical; }
         z-index: 60;
     }
 
+    /* Full, solid navigation surface: no translucent card and no page dimming. */
     #mobileMenu {
         position: fixed;
         z-index: 61;
-        background: #ffffff !important;
-        color: #1e293b;
-        opacity: 1;
-        filter: none;
-        top: calc(5rem + env(safe-area-inset-top));
-        inset-inline: 0;
-        width: min(25rem, calc(100vw - 1.25rem));
-        margin-inline: auto;
-        max-height: calc(100dvh - 6.25rem - env(safe-area-inset-bottom));
-        padding: 0.875rem;
-        border: 1px solid rgba(148, 163, 184, 0.28);
-        border-radius: 1.25rem;
-        box-shadow: 0 1.5rem 3.5rem rgba(8, 24, 38, 0.24);
+        top: calc(4.75rem + env(safe-area-inset-top));
+        right: 0;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: auto;
+        max-height: none;
+        margin: 0;
+        padding: 0.25rem 1rem max(1.25rem, env(safe-area-inset-bottom));
         overflow-y: auto;
         overscroll-behavior: contain;
-        animation: mobile-drawer-enter 180ms cubic-bezier(0.23, 1, 0.32, 1);
+        background: #ffffff !important;
+        color: #1e293b;
+        border: 0;
+        border-top: 1px solid rgba(148, 163, 184, 0.3);
+        border-radius: 0;
+        box-shadow: none;
+        opacity: 1;
+        filter: none;
+        animation: mobile-drawer-enter 160ms ease-out;
     }
+
+    /* The clear full-screen menu replaces the old dimmed page overlay. */
+    #mobileMenuBackdrop { display: none !important; }
 
     .dark #mobileMenu {
         background: #0f2537 !important;
         color: #e2e8f0;
     }
 
+    #mobileMenu > * + * { margin-top: 0 !important; }
+
     #mobileMenu a,
     #mobileThemeToggle {
         display: flex;
         align-items: center;
-        min-height: 3rem;
+        min-height: 3.75rem;
         padding-inline: 0.875rem;
-        border-radius: 0.875rem;
+        border: 0;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+        border-radius: 0;
         transition: background-color 160ms cubic-bezier(0.23, 1, 0.32, 1), color 160ms cubic-bezier(0.23, 1, 0.32, 1);
-    }
-
-    #mobileMenu a + a,
-    #mobileMenu button {
-        border-top: 1px solid rgba(148, 163, 184, 0.18);
     }
 
     #mobileMenu a:active,
@@ -521,8 +528,8 @@ textarea { resize: vertical; }
 
     #mobileMenu {
         top: calc(4.75rem + env(safe-area-inset-top));
-        width: calc(100vw - 1rem);
-        max-height: calc(100dvh - 5.75rem - env(safe-area-inset-bottom));
+        width: 100%;
+        max-height: none;
     }
 
     .floating-ai {
