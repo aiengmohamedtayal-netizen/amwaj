@@ -554,3 +554,6 @@ textarea { resize: vertical; }
 @media (max-width: 1023px) {
     html.mobile-nav-open .floating-whatsapp { display: none !important; }
 }
+@media (max-width: 1023px) {
+    html.mobile-nav-open .floating-ai { display: none !important; }
+}
