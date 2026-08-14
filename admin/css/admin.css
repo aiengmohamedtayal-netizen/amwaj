@@ -99,6 +99,8 @@ a { color: inherit; }
 .editor-advanced summary > i { color: var(--color-text-muted); transition: transform var(--duration-fast) var(--ease-apple); }
 .editor-advanced[open] summary > i { transform: rotate(180deg); }
 .editor-advanced-content { padding: 1rem; border-top: 1px solid var(--color-border-light); }
+.dynamic-editor-field[hidden], .dynamic-form-hint[hidden] { display: none !important; }
+.dynamic-form-hint { grid-column: 1 / -1; margin: 0; padding: .7rem .8rem; border: 1px solid #d8e9ee; border-radius: var(--radius-md); color: #52717d; background: #f8fbfd; font-size: .75rem; line-height: 1.55; }
 .copilot-prefill-notice { display: flex; align-items: flex-start; gap: .7rem; padding: .8rem .9rem; border: 1px solid rgba(0, 153, 216, .28); border-radius: var(--radius-lg); color: #075d80; background: linear-gradient(135deg, rgba(235,249,255,.92), rgba(239,252,248,.9)); }
 .copilot-prefill-notice > i { margin-top: .14rem; color: var(--color-primary); }
 .copilot-prefill-notice div { display: grid; gap: .14rem; }

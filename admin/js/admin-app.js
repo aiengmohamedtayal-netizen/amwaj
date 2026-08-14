@@ -247,6 +247,41 @@
     return `<details class="editor-advanced"><summary><span><i class="fa-solid fa-sliders" aria-hidden="true"></i> ${summary}</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i></summary><div class="editor-advanced-content form-grid">${content}</div></details>`;
   }
 
+  function dynamicEditorField(content, options = {}) {
+    const categories = Array.isArray(options.categories) ? options.categories.filter(Boolean) : [];
+    const categoryRule = categories.length ? ` data-category-show="${escapeHtml(categories.join(','))}"` : '';
+    const priceRule = options.requiresPrice ? ' data-requires-price="true"' : '';
+    const width = options.full ? ' full' : '';
+    return `<div class="dynamic-editor-field${width}"${categoryRule}${priceRule}>${content}</div>`;
+  }
+
+  function syncDynamicItemEditor(dialog) {
+    const form = dialog?.querySelector('#item-editor');
+    if (!form) return;
+    const category = String(form.querySelector('[name="category"]')?.value || '').trim();
+    const hasPrice = Boolean(String(form.querySelector('[name="price_label_ar"]')?.value || '').trim());
+    dialog.querySelectorAll('[data-category-show]').forEach((element) => {
+      const permitted = String(element.dataset.categoryShow || '').split(',').map((value) => value.trim()).filter(Boolean);
+      const visible = !permitted.length || permitted.includes(category);
+      element.hidden = !visible;
+      element.setAttribute('aria-hidden', String(!visible));
+    });
+    dialog.querySelectorAll('[data-requires-price]').forEach((element) => {
+      element.hidden = !hasPrice;
+      element.setAttribute('aria-hidden', String(!hasPrice));
+    });
+    const noPriceHint = dialog.querySelector('[data-no-price-hint]');
+    if (noPriceHint) noPriceHint.hidden = hasPrice;
+  }
+
+  function bindDynamicItemEditor(dialog) {
+    const form = dialog?.querySelector('#item-editor');
+    if (!form) return;
+    form.querySelector('[name="category"]')?.addEventListener('change', () => syncDynamicItemEditor(dialog));
+    form.querySelector('[name="price_label_ar"]')?.addEventListener('input', () => syncDynamicItemEditor(dialog));
+    syncDynamicItemEditor(dialog);
+  }
+
   function copilotPrefillNotice(fields) {
     const count = Array.isArray(fields) ? fields.length : 0;
     if (!count) return '';
@@ -429,12 +464,13 @@
     const advanced = meta.image ? `
       ${englishField('العنوان بالإنجليزية', 'title_en', item.title_en, 'title_ar')}
       ${englishField('الوصف بالإنجليزية', 'description_en', item.description_en, 'description_ar', { textarea: true, full: true })}
-      ${englishField('السعر أو وصف السعر بالإنجليزية', 'price_label_en', editorValue(item.price_label_en, draftFallbacks.priceLabelEn), 'price_label_ar', { full: true })}
+      ${dynamicEditorField(englishField('السعر أو وصف السعر بالإنجليزية', 'price_label_en', editorValue(item.price_label_en, draftFallbacks.priceLabelEn), 'price_label_ar', { full: true }), { requiresPrice: true, full: true })}
+      <p class="dynamic-form-hint full" data-no-price-hint>لم تُدخل سعرًا الآن، لذلك أُخفيت تفاصيل السعر الإنجليزية الاختيارية. ستظهر تلقائيًا عند كتابة سعر أو وصف سعر بالعربية.</p>
       <div class="field full derived-fields-control"><div class="field-heading"><strong>حقول مساعدة من المحتوى العربي</strong><button class="btn btn-small btn-translate" type="button" data-action="generate-derived"><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i> توليد تلقائي</button></div><span class="field-hint">يستخرج نصًا بديلًا ومزايا من المحتوى الذي أدخلته فقط، ولا يستبدل تعديلاتك اليدوية.</span></div>
       ${field('النص البديل بالعربية', 'image_alt_ar', item.image_alt_ar, { required: false })}
       ${englishField('النص البديل بالإنجليزية', 'image_alt_en', item.image_alt_en, 'image_alt_ar')}
-      ${field('شارة بالعربية', 'badge_ar', item.badge_ar, { required: false })}
-      ${englishField('شارة بالإنجليزية', 'badge_en', item.badge_en, 'badge_ar')}
+      ${dynamicEditorField(field('شارة بالعربية', 'badge_ar', item.badge_ar, { required: false }), { categories: kind === 'packages' ? ['vip'] : ['umrah'] })}
+      ${dynamicEditorField(englishField('شارة بالإنجليزية', 'badge_en', item.badge_en, 'badge_ar'), { categories: kind === 'packages' ? ['vip'] : ['umrah'] })}
       ${field('التقييم', 'rating', item.rating, { type: 'number', required: false, step: '0.1', hint: 'من 0 إلى 5.' })}
       ${field('المزايا', 'highlights', Array.isArray(item.highlights) ? item.highlights.join('\n') : '', { textarea: true, full: true, required: false, hint: 'اكتب ميزة واحدة في كل سطر.' })}
       ${field('ترتيب العرض', 'sort_order', item.sort_order, { type: 'number', step: '1', required: false })}
@@ -449,6 +485,7 @@
     const dialog = openDialog(`${isNew ? 'إضافة' : 'تعديل'} ${meta.singular}`, 'احفظ مسودة في أي وقت. عند النشر فقط سنطلب الحقول اللازمة لعرض المحتوى للزوار.', `<form id="item-editor" class="form-grid" novalidate>${copilotPrefillNotice(Object.keys(patch))}<input type="hidden" name="slug" value="${escapeHtml(item.slug || '')}">${primary}<div class="full">${advancedSection(advanced)}</div></form>`, `<button type="button" class="btn" data-close-dialog>إلغاء</button><button type="button" class="btn" data-action="save-item" data-kind="${kind}" data-id="${item.id || ''}" data-mode="draft"><i class="fa-solid fa-floppy-disk"></i> حفظ مسودة</button><button type="button" class="btn btn-primary" data-action="save-item" data-kind="${kind}" data-id="${item.id || ''}" data-mode="published"><i class="fa-solid fa-paper-plane"></i> نشر</button>`);
     dialog.dataset.kind = kind;
     markCopilotPrefill(dialog, Object.keys(patch));
+    bindDynamicItemEditor(dialog);
   }
 
   function itemPayloadFromForm(kind, form, mode) {
