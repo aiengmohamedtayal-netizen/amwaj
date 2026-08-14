@@ -37,7 +37,10 @@
   function mutationSummary(mutation) {
     if (!mutation) return '';
     if (mutation.operation === 'delete') return 'سيُحذف السجل المحدد نهائياً. لا يمكن التراجع عن هذا الإجراء.';
-    const fields = Object.keys(mutation.patch || {});
+    const labels = {
+      category: 'الفئة', title_ar: 'العنوان العربي', title_en: 'العنوان الإنجليزي', description_ar: 'الوصف العربي', description_en: 'الوصف الإنجليزي', image_url: 'الصورة المرفوعة', featured_image_url: 'صورة الغلاف المرفوعة', image_alt_ar: 'وصف الصورة العربي', image_alt_en: 'وصف الصورة الإنجليزي', featured_image_alt_ar: 'وصف الغلاف العربي', featured_image_alt_en: 'وصف الغلاف الإنجليزي', status: 'الحالة', is_active: 'التفعيل', is_featured: 'التمييز', sort_order: 'ترتيب العرض', price_label_ar: 'وصف السعر العربي', price_label_en: 'وصف السعر الإنجليزي', icon_class: 'الأيقونة', category_id: 'التصنيف', content_ar: 'المحتوى العربي', content_en: 'المحتوى الإنجليزي', excerpt_ar: 'الملخص العربي', excerpt_en: 'الملخص الإنجليزي'
+    };
+    const fields = Object.keys(mutation.patch || {}).map((field) => labels[field] || field);
     return fields.length ? `الحقول التي ستتغير: ${fields.join('، ')}` : 'سيُحفظ التغيير المقترح.';
   }
 
@@ -62,7 +65,7 @@
           <div class="admin-copilot-title"><span class="admin-copilot-avatar"><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i></span><span><strong>مساعد أمواج الإداري</strong><small><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> GPT-5.6 Luna · متصل بالبيانات الحية</small></span></div>
           <div class="admin-copilot-head-actions"><button type="button" class="admin-copilot-icon-button" data-copilot="language" aria-label="التبديل إلى الإنجليزية" title="Arabic / English">ع</button><button type="button" class="admin-copilot-icon-button" data-copilot="close" aria-label="إغلاق المساعد"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div>
         </header>
-        <div class="admin-copilot-notice"><i class="fa-solid fa-circle-info" aria-hidden="true"></i><span>ارفع صورة وأنشئ برنامجاً بالمحادثة، أو اطلب أي تعديل. لن يُنفذ أي تغيير قبل تأكيدك.</span></div>
+        <div class="admin-copilot-notice"><i class="fa-solid fa-circle-info" aria-hidden="true"></i><span>ارفع الصورة كملف فقط ثم أنشئ برنامجاً بالمحادثة، أو اطلب أي تعديل. لن يُنفذ أي تغيير قبل تأكيدك.</span></div>
         <div id="admin-copilot-messages" class="admin-copilot-messages" aria-live="polite" aria-relevant="additions text">
           <article class="copilot-message copilot-message-assistant"><div class="copilot-message-mark"><i class="fa-solid fa-sparkles" aria-hidden="true"></i></div><div class="copilot-message-body"><p>مرحباً. اسألني عن الأسعار أو المحتوى أو آراء العملاء، أو اطلب مني إعداد تعديل وسأعرضه عليك للتأكيد أولاً.</p></div></article>
         </div>
@@ -168,7 +171,7 @@
       const result = await window.AmwajAdminClient.uploadImage(file, 'admin-copilot');
       state.attachments.push({ url: result.publicUrl, name: file.name });
       renderAttachments();
-      appendMessage('assistant', `تم رفع الصورة «${file.name}». اكتب الآن ما تريد إضافته أو تعديله، وسأسألك عن بيانات البرنامج الناقصة.`);
+      appendMessage('assistant', `تم رفع الصورة «${file.name}». اكتب الآن ما تريد إضافته أو تعديله؛ هذه هي الطريقة الوحيدة لإضافة الصور، ولا يلزم إدخال أي رابط.`);
     } catch (error) {
       appendMessage('assistant', error.message || 'تعذر رفع الصورة.');
     } finally {
