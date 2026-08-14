@@ -17,8 +17,9 @@ const MAX_BODY_BYTES = 1024 * 1024;
 const MAX_NOTION_BLOCKS = 500;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SAFE_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const DIRECT_ACCOUNT_TEMPLATE_NAME = 'قالب — حساب مدير جديد';
 const PROCESSABLE_EVENT_TYPES = new Set(['page.created', 'page.properties_updated', 'page.content_updated']);
-const ACTIONS = new Set(['Create', 'Update', 'Publish', 'Archive', 'Delete', 'Invite Admin', 'Disable Admin', 'Reactivate Admin', 'Send Password Reset', 'Sync']);
+const ACTIONS = new Set(['Create', 'Update', 'Publish', 'Archive', 'Delete', 'Invite Admin', 'Create Direct Account', 'Disable Admin', 'Reactivate Admin', 'Send Password Reset', 'Sync']);
 const ENTITY_NAMES = new Set(['Package', 'Destination', 'Service', 'Pricing Offer', 'Blog Category', 'Blog Post', 'Review', 'Setting', 'Admin User']);
 
 // The code uses stable internal keys while the Notion workspace is fully Arabic.
@@ -41,13 +42,13 @@ const NOTION_PROPERTY_AR = {
   'SEO Description AR': 'وصف SEO بالعربية', 'SEO Description EN': 'وصف SEO بالإنجليزية',
   'OG Image URL': 'رابط صورة المشاركة', 'Published At': 'تاريخ النشر', 'Customer Name': 'اسم العميل',
   'Review Text': 'نص المراجعة', 'Setting Key': 'مفتاح الإعداد', 'Setting Value JSON': 'قيمة الإعداد JSON',
-  Email: 'البريد الإلكتروني', 'Auth User ID': 'معرّف مستخدم الدخول', 'Confirm Delete': 'تأكيد الحذف',
+  Email: 'البريد الإلكتروني', Password: 'كلمة المرور', 'Auth User ID': 'معرّف مستخدم الدخول', 'Confirm Delete': 'تأكيد الحذف',
   Slug: 'الرابط المختصر', 'Last Synced At': 'آخر مزامنة', Notes: 'ملاحظات عامة',
 };
 
 const SELECT_VALUE_AR = {
   'No Action': 'بدون إجراء', Create: 'إنشاء', Update: 'تعديل', Publish: 'نشر', Archive: 'أرشفة', Delete: 'حذف',
-  'Invite Admin': 'دعوة مدير', 'Disable Admin': 'تعطيل مدير', 'Reactivate Admin': 'إعادة تفعيل مدير', 'Send Password Reset': 'إرسال رابط تعيين كلمة المرور', Sync: 'مزامنة',
+  'Invite Admin': 'دعوة مدير', 'Create Direct Account': 'إنشاء حساب مباشر', 'Disable Admin': 'تعطيل مدير', 'Reactivate Admin': 'إعادة تفعيل مدير', 'Send Password Reset': 'إرسال رابط تعيين كلمة المرور', Sync: 'مزامنة',
   Package: 'برنامج', Destination: 'وجهة', Service: 'خدمة', 'Pricing Offer': 'عرض سعر', 'Blog Category': 'تصنيف مدونة',
   'Blog Post': 'مقال مدونة', Review: 'رأي عميل', Setting: 'إعداد موقع', 'Admin User': 'مدير النظام',
   Ready: 'جاهز للتنفيذ', Processing: 'جارٍ التنفيذ', Completed: 'اكتمل', Failed: 'فشل', 'Needs Review': 'يحتاج مراجعة',
@@ -610,6 +611,36 @@ async function inviteAdmin(config, page) {
   return { id: userId, email, full_name: fullName, profile: Array.isArray(profiles) ? profiles[0] || null : profiles };
 }
 
+async function createAdminWithPassword(config, page) {
+  const email = trimText(stringProperty(page, 'Email'), 320).toLowerCase();
+  const fullName = trimText(stringProperty(page, 'Name'), 240);
+  const password = trimText(stringProperty(page, 'Password'), 1024);
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw error('Email is invalid.');
+  if (!fullName) throw error('Name is required.');
+  if (!password) throw error('Password is required.');
+  if (password.length < 12) throw error('Password must be at least 12 characters.');
+
+  // The password is sent only to Supabase Auth over TLS. It is never returned,
+  // persisted in an application table, logged, or written back to Notion.
+  const createdUser = await authAdminRequest(config, '/auth/v1/admin/users', {
+    method: 'POST',
+    body: JSON.stringify({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: { full_name: fullName },
+    }),
+  });
+  const userId = createdUser?.user?.id || createdUser?.id;
+  if (!UUID_PATTERN.test(String(userId || ''))) throw error('Supabase did not return the created user ID.', 502);
+  const profiles = await supabaseRequest(config, '/rest/v1/profiles', {
+    method: 'POST',
+    headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
+    body: JSON.stringify({ id: userId, full_name: fullName, is_admin: true }),
+  });
+  return { id: userId, email, full_name: fullName, profile: Array.isArray(profiles) ? profiles[0] || null : profiles };
+}
+
 async function updateAdmin(config, userId, page) {
   ensureUuid(userId, 'Auth User ID');
   const fullName = trimText(stringProperty(page, 'Name'), 240);
@@ -709,6 +740,11 @@ async function executeAdminAction(config, page, action) {
     if (authUserId) throw error('Invite Admin requires an empty Auth User ID.');
     const record = await inviteAdmin(config, page);
     return { operation: 'invite', entity: 'Admin User', externalId: record.id, record };
+  }
+  if (action === 'Create Direct Account') {
+    if (authUserId) throw error('Create Direct Account requires an empty Auth User ID.');
+    const record = await createAdminWithPassword(config, page);
+    return { operation: 'create_direct_account', entity: 'Admin User', externalId: record.id, record, clearPassword: true };
   }
   if (!authUserId) throw error(`${action} requires Auth User ID.`);
   if (action === 'Update') {
@@ -922,6 +958,13 @@ function arabicActionName(action) {
   return SELECT_VALUE_AR[action] || action;
 }
 
+function isIncompleteDirectAccount(page) {
+  const name = trimText(stringProperty(page, 'Name'), 240);
+  const email = trimText(stringProperty(page, 'Email'), 320);
+  const password = trimText(stringProperty(page, 'Password'), 1024);
+  return !name || name === DIRECT_ACCOUNT_TEMPLATE_NAME || !email || !password;
+}
+
 function arabicResultMessage(message) {
   const text = trimText(message, 850).replace(/[\r\n]+/g, ' ');
   const exact = {
@@ -935,9 +978,12 @@ function arabicResultMessage(message) {
     'Delete requires Confirm Delete to be checked.': 'يجب تفعيل مربع «تأكيد الحذف» قبل الحذف النهائي.',
     'Create requires an empty External ID.': 'عند الإنشاء يجب أن يظل «المعرّف الخارجي» فارغًا.',
     'Invite Admin requires an empty Auth User ID.': 'عند دعوة مدير جديد يجب أن يظل «معرّف مستخدم الدخول» فارغًا.',
+    'Create Direct Account requires an empty Auth User ID.': 'عند إنشاء حساب مباشر يجب أن يظل «معرّف مستخدم الدخول» فارغًا.',
     'Name is required for an admin invitation.': 'الاسم مطلوب لإرسال دعوة المدير.',
     'Name is required.': 'الاسم مطلوب.',
     'Email is invalid.': 'البريد الإلكتروني غير صحيح.',
+    'Password is required.': 'كلمة المرور مطلوبة.',
+    'Password must be at least 12 characters.': 'كلمة المرور يجب ألا تقل عن 12 حرفًا.',
     'Slug may contain lowercase letters, numbers, and hyphens only.': 'الرابط المختصر يقبل حروفًا إنجليزية صغيرة وأرقامًا وشرطات فقط.',
     'Sort Order cannot be negative.': 'ترتيب العرض لا يمكن أن يكون رقمًا سالبًا.',
     'Rating must be between 0 and 5.': 'التقييم يجب أن يكون بين 0 و5.',
@@ -970,6 +1016,9 @@ async function processPageEvent(config, event, webhookEventId) {
   if (!ENTITY_NAMES.has(entity)) return { ignored: true, reason: 'Unknown entity.' };
   if (!ACTIONS.has(action)) return { ignored: true, reason: 'No actionable request.' };
   if (processStatus !== 'Ready' && processStatus !== 'Failed') return { ignored: true, reason: 'Page is not ready for execution.' };
+  if (entity === 'Admin User' && action === 'Create Direct Account' && isIncompleteDirectAccount(page)) {
+    return { ignored: true, reason: 'Direct account template is waiting for name, email, and password.' };
+  }
 
   const claim = await claimOperation(config, { notionEventId: webhookEventId, notionPageId: pageId, entity, action });
   if (!claim.claimed) {
@@ -983,6 +1032,7 @@ async function processPageEvent(config, event, webhookEventId) {
       : await executeContentAction(config, page, entity, action);
     const resultProperties = {
       ...propertiesFromRecord(entity, result.record),
+      ...(result.clearPassword ? { Password: textProperty('') } : {}),
       ...operationProperties({
         processStatus: 'Completed',
         action: 'No Action',
