@@ -67,6 +67,42 @@ function cleanPlan(value) {
     };
 }
 
+function configuredProviders() {
+    const sovereignKey = String(process.env.SOVEREIGN_EG_API_KEY || '').trim();
+    const groqKey = String(process.env.GROQ_API_KEY || '').trim();
+    const providers = [];
+    if (sovereignKey) {
+        providers.push({
+            name: 'SovereignEG',
+            endpoint: 'https://backend.sovereigneg.com/v1/chat/completions',
+            apiKey: sovereignKey,
+            model: 'deepseek-v4-flash'
+        });
+    }
+    if (groqKey) {
+        providers.push({
+            name: 'Groq',
+            endpoint: 'https://api.groq.com/openai/v1/chat/completions',
+            apiKey: groqKey,
+            model: 'llama-3.3-70b-versatile'
+        });
+    }
+    return providers;
+}
+
+async function requestPlan(provider, messages) {
+    return fetch(provider.endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${provider.apiKey}` },
+        body: JSON.stringify({
+            model: provider.model,
+            temperature: 0.35,
+            response_format: { type: 'json_object' },
+            messages
+        })
+    });
+}
+
 export default async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -91,9 +127,9 @@ export default async function handler(req, res) {
             return res.status(400).json({ error: 'Validation Error', message: 'يرجى تحديد وجهة أو إدخال تفاصيل الرحلة.' });
         }
 
-        const apiKey = String(process.env.GROQ_API_KEY || '').trim();
-        if (!apiKey) {
-            console.error('[TRIP_PLANNER_CONFIG_ERROR] GROQ_API_KEY is missing');
+        const providers = configuredProviders();
+        if (providers.length === 0) {
+            console.error('[TRIP_PLANNER_CONFIG_ERROR] No primary or fallback provider key is configured');
             return res.status(500).json({ error: 'Configuration Error', message: 'خدمة مخطط الرحلات غير مهيأة على الخادم حالياً.' });
         }
 
@@ -128,22 +164,26 @@ ${businessContext || '{}'}
 
 أنشئ الخطة الآن بصيغة JSON فقط.`;
 
-        const upstream = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-            body: JSON.stringify({
-                model: 'llama-3.3-70b-versatile',
-                temperature: 0.35,
-                response_format: { type: 'json_object' },
-                messages: [
-                    { role: 'system', content: systemPrompt },
-                    { role: 'user', content: userPrompt }
-                ]
-            })
-        });
-
-        if (!upstream.ok) {
-            console.error(`[TRIP_PLANNER_UPSTREAM_ERROR] status=${upstream.status}`, (await upstream.text()).slice(0, 500));
+        const messages = [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+        ];
+        let upstream;
+        let activeProvider;
+        for (const provider of providers) {
+            try {
+                const response = await requestPlan(provider, messages);
+                if (response.ok) {
+                    upstream = response;
+                    activeProvider = provider;
+                    break;
+                }
+                console.error(`[TRIP_PLANNER_UPSTREAM_ERROR] provider=${provider.name} status=${response.status}`, (await response.text()).slice(0, 500));
+            } catch (providerError) {
+                console.error(`[TRIP_PLANNER_PROVIDER_ERROR] provider=${provider.name}`, providerError.message);
+            }
+        }
+        if (!upstream || !activeProvider) {
             return res.status(502).json({ error: 'AI Provider Error', message: 'تعذّر إنشاء الخطة الآن. يرجى المحاولة لاحقاً.' });
         }
 
@@ -157,7 +197,7 @@ ${businessContext || '{}'}
             return res.status(502).json({ error: 'AI Response Error', message: 'تعذّر قراءة الخطة المُنشأة. يرجى المحاولة مرة أخرى.' });
         }
 
-        console.log(`[TRIP_PLANNER_OK] ip=${ip} duration=${duration} travelers=${travelers}`);
+        console.log(`[TRIP_PLANNER_OK] provider=${activeProvider.name} model=${activeProvider.model} ip=${ip} duration=${duration} travelers=${travelers}`);
         return res.status(200).json({ plan: cleanPlan(parsed) });
     } catch (error) {
         console.error('[TRIP_PLANNER_ERROR]', error);
