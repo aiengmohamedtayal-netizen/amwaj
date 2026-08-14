@@ -29,6 +29,11 @@
     }
   };
   const state = { auth: null, page: 'dashboard', collections: {}, search: '' };
+  const draftFallbacks = {
+    imageUrl: '/assets/logo.png',
+    priceLabelAr: 'قيد التحديث',
+    priceLabelEn: 'Coming soon'
+  };
 
   function escapeHtml(value) {
     return String(value ?? '').replace(/[&<>'"]/g, (character) => ({
@@ -39,6 +44,10 @@
   function safeUrl(value) {
     const candidate = String(value || '').trim();
     return /^(https?:\/\/|\/)/i.test(candidate) ? candidate : '';
+  }
+
+  function editorValue(value, fallback) {
+    return String(value || '') === fallback ? '' : value;
   }
 
   function autoSlug(title, records, fallback) {
@@ -230,7 +239,58 @@
 
   function imageUploadField(fileName, urlName, currentUrl, scope, label) {
     const preview = safeUrl(currentUrl);
-    return `<div class="field full media-upload-field"><label for="field-${fileName}">${label || 'رفع صورة'}</label><input class="input" id="field-${fileName}" name="${fileName}" type="file" accept="image/jpeg,image/png,image/webp,image/avif" data-media-scope="${escapeHtml(scope || 'general')}"><input name="${urlName}" type="hidden" value="${escapeHtml(currentUrl || '')}"><span class="field-hint">JPG أو PNG أو WebP أو AVIF، حتى 5 ميغابايت. تُحفظ الصورة في مساحة وسائط أمواج الآمنة.</span>${preview ? `<img class="media-upload-preview" src="${escapeHtml(preview)}" alt="" onerror="this.remove()">` : ''}</div>`;
+    return `<div class="field full media-upload-field"><label for="field-${fileName}">${label || 'رفع صورة'}</label><input class="input" id="field-${fileName}" name="${fileName}" type="file" accept="image/jpeg,image/png,image/webp,image/avif" data-media-scope="${escapeHtml(scope || 'general')}"><input name="${urlName}" type="hidden" value="${escapeHtml(currentUrl || '')}"><span class="field-hint">JPG / PNG / WebP / AVIF — حتى 5 ميغابايت</span>${preview ? `<img class="media-upload-preview" src="${escapeHtml(preview)}" alt="" onerror="this.remove()">` : ''}</div>`;
+  }
+
+  function advancedSection(content, summary = 'إعدادات متقدمة') {
+    return `<details class="editor-advanced"><summary><span><i class="fa-solid fa-sliders" aria-hidden="true"></i> ${summary}</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i></summary><div class="editor-advanced-content form-grid">${content}</div></details>`;
+  }
+
+  function englishField(label, name, value, sourceName, options) {
+    const settings = options || {};
+    const className = settings.full ? 'field full' : 'field';
+    const required = settings.required ? 'required' : '';
+    const id = `field-${name}`;
+    const generate = `<button class="btn btn-small btn-translate" type="button" data-action="generate-english" data-source="${escapeHtml(sourceName)}" data-target="${escapeHtml(name)}"><i class="fa-solid fa-language" aria-hidden="true"></i> توليد تلقائي</button>`;
+    if (settings.textarea) return `<div class="${className}"><div class="field-heading"><label for="${id}">${label}</label>${generate}</div><textarea class="textarea" id="${id}" name="${name}" dir="ltr" ${required}${settings.style ? ` style="${settings.style}"` : ''}>${escapeHtml(value || '')}</textarea>${settings.hint ? `<span class="field-hint">${settings.hint}</span>` : ''}</div>`;
+    return `<div class="${className}"><div class="field-heading"><label for="${id}">${label}</label>${generate}</div><input class="input" id="${id}" name="${name}" type="text" dir="ltr" value="${escapeHtml(value || '')}" ${required}>${settings.hint ? `<span class="field-hint">${settings.hint}</span>` : ''}</div>`;
+  }
+
+  async function generateEnglish(button) {
+    const dialog = button.closest('dialog');
+    const source = dialog?.querySelector(`[name="${button.dataset.source}"]`);
+    const target = dialog?.querySelector(`[name="${button.dataset.target}"]`);
+    const sourceText = String(source?.value || '').trim();
+    if (!source || !target || !sourceText) {
+      showToast('error', 'أدخل النص العربي أولًا', 'اكتب المحتوى العربي الذي تريد توليد نسخته الإنجليزية.');
+      source?.focus();
+      return;
+    }
+    const session = await client.getValidSession();
+    if (!session?.access_token) {
+      showToast('error', 'انتهت الجلسة', 'سجّل الدخول مرة أخرى ثم أعد المحاولة.');
+      return;
+    }
+    const original = button.innerHTML;
+    try {
+      setButtonBusy(button, true);
+      button.innerHTML = '<i class="fa-solid fa-spinner"></i> جارٍ التوليد…';
+      const response = await fetch('/api/admin-copilot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ mode: 'translate', targetLang: 'en', text: sourceText })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result?.translation) throw new Error(result?.message || 'تعذر توليد النص الإنجليزي حالياً.');
+      target.value = result.translation;
+      target.dispatchEvent(new Event('input', { bubbles: true }));
+      showToast('success', 'تم توليد الإنجليزية', 'يمكنك مراجعة النص وتعديله قبل الحفظ أو النشر.');
+    } catch (error) {
+      showToast('error', 'تعذر توليد الإنجليزية', error.message);
+    } finally {
+      button.innerHTML = original;
+      setButtonBusy(button, false);
+    }
   }
 
   function openDialog(title, subtitle, body, footer) {
@@ -287,28 +347,37 @@
     const meta = collectionMeta[kind];
     const isNew = !row;
     const item = row || { status: 'draft', is_active: true, sort_order: 0, rating: '', highlights: [], category: meta.categories[0]?.[0] || '', is_featured: false };
-    const common = `
-      ${meta.categories.length ? field('الفئة', 'category', item.category, { select: categoryOptions(kind, item.category) }) : ''}
+    const primary = meta.image ? `
+      ${field('الفئة', 'category', item.category, { select: categoryOptions(kind, item.category) })}
       ${field('العنوان بالعربية', 'title_ar', item.title_ar)}
-      ${field('العنوان بالإنجليزية', 'title_en', item.title_en)}
       ${field('الوصف بالعربية', 'description_ar', item.description_ar, { textarea: true, full: true })}
-      ${field('الوصف بالإنجليزية', 'description_en', item.description_en, { textarea: true, full: true })}
-      ${field('ترتيب العرض', 'sort_order', item.sort_order, { type: 'number', step: '1' })}
-      ${checkField('العنصر نشط', 'is_active', item.is_active)}
+      ${imageUploadField('image_file', 'image_url', editorValue(item.image_url, draftFallbacks.imageUrl), kind, 'صورة البطاقة')}
+      ${field('السعر أو وصف السعر بالعربية', 'price_label_ar', editorValue(item.price_label_ar, draftFallbacks.priceLabelAr), { full: true, required: false, placeholder: 'مثال: يبدأ من 45,000 ج.م أو تواصل لمعرفة السعر' })}
+    ` : `
+      ${field('العنوان بالعربية', 'title_ar', item.title_ar)}
+      ${field('الوصف بالعربية', 'description_ar', item.description_ar, { textarea: true, full: true })}
+      ${field('فئة الأيقونة', 'icon_class', item.icon_class || 'fa-star', { hint: 'مثال: fa-plane أو fa-hotel.' })}
     `;
-    const media = meta.image ? `
-      ${imageUploadField('image_file', 'image_url', item.image_url, kind, 'صورة البطاقة')}
+    const advanced = meta.image ? `
+      ${englishField('العنوان بالإنجليزية', 'title_en', item.title_en, 'title_ar')}
+      ${englishField('الوصف بالإنجليزية', 'description_en', item.description_en, 'description_ar', { textarea: true, full: true })}
+      ${englishField('السعر أو وصف السعر بالإنجليزية', 'price_label_en', editorValue(item.price_label_en, draftFallbacks.priceLabelEn), 'price_label_ar', { full: true })}
       ${field('النص البديل بالعربية', 'image_alt_ar', item.image_alt_ar, { required: false })}
-      ${field('النص البديل بالإنجليزية', 'image_alt_en', item.image_alt_en, { required: false })}
+      ${englishField('النص البديل بالإنجليزية', 'image_alt_en', item.image_alt_en, 'image_alt_ar')}
       ${field('شارة بالعربية', 'badge_ar', item.badge_ar, { required: false })}
-      ${field('شارة بالإنجليزية', 'badge_en', item.badge_en, { required: false })}
+      ${englishField('شارة بالإنجليزية', 'badge_en', item.badge_en, 'badge_ar')}
       ${field('التقييم', 'rating', item.rating, { type: 'number', required: false, step: '0.1', hint: 'من 0 إلى 5.' })}
       ${field('المزايا', 'highlights', Array.isArray(item.highlights) ? item.highlights.join('\n') : '', { textarea: true, full: true, required: false, hint: 'اكتب ميزة واحدة في كل سطر.' })}
-      ${field('وصف السعر بالعربية', 'price_label_ar', item.price_label_ar, { full: true })}
-      ${field('وصف السعر بالإنجليزية', 'price_label_en', item.price_label_en, { full: true })}
+      ${field('ترتيب العرض', 'sort_order', item.sort_order, { type: 'number', step: '1', required: false })}
+      ${checkField('العنصر نشط', 'is_active', item.is_active)}
       ${meta.featured ? checkField('إظهار كعنصر مميز', 'is_featured', item.is_featured) : ''}
-    ` : `${field('فئة الأيقونة', 'icon_class', item.icon_class, { hint: 'مثال: fa-plane أو fa-hotel.' })}`;
-    const dialog = openDialog(`${isNew ? 'إضافة' : 'تعديل'} ${meta.singular}`, 'الحفظ كمسودة لا ينشر المحتوى. النشر يعرضه لزوار الموقع عند اكتمال الربط العام.', `<form id="item-editor" class="form-grid" novalidate><input type="hidden" name="slug" value="${escapeHtml(item.slug || '')}">${common}${media}</form>`, `<button type="button" class="btn" data-close-dialog>إلغاء</button><button type="button" class="btn" data-action="save-item" data-kind="${kind}" data-id="${item.id || ''}" data-mode="draft"><i class="fa-solid fa-floppy-disk"></i> حفظ كمسودة</button><button type="button" class="btn btn-primary" data-action="save-item" data-kind="${kind}" data-id="${item.id || ''}" data-mode="published"><i class="fa-solid fa-paper-plane"></i> نشر</button>`);
+    ` : `
+      ${englishField('العنوان بالإنجليزية', 'title_en', item.title_en, 'title_ar')}
+      ${englishField('الوصف بالإنجليزية', 'description_en', item.description_en, 'description_ar', { textarea: true, full: true })}
+      ${field('ترتيب العرض', 'sort_order', item.sort_order, { type: 'number', step: '1', required: false })}
+      ${checkField('الخدمة نشطة', 'is_active', item.is_active)}
+    `;
+    const dialog = openDialog(`${isNew ? 'إضافة' : 'تعديل'} ${meta.singular}`, 'احفظ مسودة في أي وقت. عند النشر فقط سنطلب الحقول اللازمة لعرض المحتوى للزوار.', `<form id="item-editor" class="form-grid" novalidate><input type="hidden" name="slug" value="${escapeHtml(item.slug || '')}">${primary}<div class="full">${advancedSection(advanced)}</div></form>`, `<button type="button" class="btn" data-close-dialog>إلغاء</button><button type="button" class="btn" data-action="save-item" data-kind="${kind}" data-id="${item.id || ''}" data-mode="draft"><i class="fa-solid fa-floppy-disk"></i> حفظ مسودة</button><button type="button" class="btn btn-primary" data-action="save-item" data-kind="${kind}" data-id="${item.id || ''}" data-mode="published"><i class="fa-solid fa-paper-plane"></i> نشر</button>`);
     dialog.dataset.kind = kind;
   }
 
@@ -319,19 +388,34 @@
     const payload = {
       slug: value('slug') || autoSlug(value('title_en'), state.collections[kind], `${kind}-item`), title_ar: value('title_ar'), title_en: value('title_en'),
       description_ar: value('description_ar'), description_en: value('description_en'),
-      status: mode, is_active: data.has('is_active'), sort_order: Number(value('sort_order') || 0)
+      status: mode, is_active: data.has('is_active'), sort_order: Math.max(0, Number(value('sort_order') || 0))
     };
     if (meta.categories.length) payload.category = value('category');
     if (meta.image) {
       const ratingRaw = value('rating');
-      payload.image_url = value('image_url'); payload.image_alt_ar = value('image_alt_ar') || null; payload.image_alt_en = value('image_alt_en') || null;
+      payload.image_url = value('image_url') || draftFallbacks.imageUrl; payload.image_alt_ar = value('image_alt_ar') || null; payload.image_alt_en = value('image_alt_en') || null;
       payload.badge_ar = value('badge_ar') || null; payload.badge_en = value('badge_en') || null;
       payload.rating = ratingRaw ? Number(ratingRaw) : null;
       payload.highlights = value('highlights').split('\n').map((line) => line.trim()).filter(Boolean);
-      payload.price_label_ar = value('price_label_ar'); payload.price_label_en = value('price_label_en');
+      payload.price_label_ar = value('price_label_ar') || draftFallbacks.priceLabelAr; payload.price_label_en = value('price_label_en') || draftFallbacks.priceLabelEn;
       if (meta.featured) payload.is_featured = data.has('is_featured');
-    } else { payload.icon_class = value('icon_class'); }
+    } else { payload.icon_class = value('icon_class') || 'fa-star'; }
     return payload;
+  }
+
+  function itemPublishIssues(kind, payload) {
+    const meta = collectionMeta[kind];
+    const issues = [];
+    if (!payload.title_ar) issues.push('العنوان بالعربية');
+    if (!payload.title_en) issues.push('العنوان بالإنجليزية');
+    if (!payload.description_ar) issues.push('الوصف بالعربية');
+    if (!payload.description_en) issues.push('الوصف بالإنجليزية');
+    if (meta.categories.length && !payload.category) issues.push('الفئة');
+    if (meta.image && (!payload.image_url || payload.image_url === draftFallbacks.imageUrl)) issues.push('صورة البطاقة');
+    if (meta.image && (!payload.price_label_ar || payload.price_label_ar === draftFallbacks.priceLabelAr)) issues.push('السعر أو وصف السعر بالعربية');
+    if (meta.image && (!payload.price_label_en || payload.price_label_en === draftFallbacks.priceLabelEn)) issues.push('السعر أو وصف السعر بالإنجليزية');
+    if (!meta.image && !payload.icon_class) issues.push('فئة الأيقونة');
+    return issues;
   }
 
   async function saveItem(button) {
@@ -340,6 +424,7 @@
     if (!form.reportValidity()) return;
     const kind = button.dataset.kind;
     const meta = collectionMeta[kind];
+    const mode = button.dataset.mode;
     setButtonBusy(button, true);
     try {
       const imageFile = form.querySelector('[name="image_file"]')?.files?.[0];
@@ -348,13 +433,16 @@
         const upload = await client.uploadImage(imageFile, kind);
         form.querySelector('[name="image_url"]').value = upload.publicUrl;
       }
-      const payload = itemPayloadFromForm(kind, form, button.dataset.mode);
-      if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(payload.slug)) throw new Error('صيغة المعرّف غير صحيحة. استخدم حروفًا إنجليزية صغيرة وأرقامًا وشرطات فقط.');
-      if (meta.image && !payload.image_url) throw new Error('ارفع صورة للبطاقة قبل الحفظ.');
+      const payload = itemPayloadFromForm(kind, form, mode);
+      if (mode === 'published') {
+        const issues = itemPublishIssues(kind, payload);
+        if (issues.length) throw new Error(`للنشر، أكمل: ${issues.join('، ')}.`);
+      }
+      if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(payload.slug)) throw new Error('تعذر إنشاء رابط داخلي صالح. اكتب عنوانًا إنجليزيًا أو أضفه من الإعدادات المتقدمة.');
       if (payload.rating !== null && (payload.rating < 0 || payload.rating > 5)) throw new Error('التقييم غير صحيح. أدخل قيمة بين 0 و5.');
       if (button.dataset.id) await client.update(meta.table, button.dataset.id, payload); else await client.create(meta.table, payload);
       dialog.close();
-      showToast('success', button.dataset.mode === 'published' ? 'تم نشر المحتوى' : 'تم حفظ المسودة', `${meta.singular} جاهز للمراجعة.`);
+      showToast('success', mode === 'published' ? 'تم نشر المحتوى' : 'تم حفظ المسودة', mode === 'published' ? 'أصبح المحتوى متاحًا للزوار.' : `${meta.singular} جاهز للمراجعة لاحقًا.`);
       await renderCollection(kind);
     } catch (error) {
       showToast('error', 'تعذر حفظ التغييرات', error.message);
@@ -504,25 +592,28 @@
     const subject = offerValue(container, 'subject');
     const [subjectType, subjectId] = subject.split(':');
     const departure = offerValue(container, 'departure_month');
-    const mode = offerValue(container, 'price_mode');
+    const status = statusOverride || offerValue(container, 'status') || 'draft';
     const priceRaw = offerValue(container, 'price_amount');
     const discountRaw = offerValue(container, 'discounted_price_amount');
     const minTravelers = Number(offerValue(container, 'min_travelers'));
     const maxTravelers = Number(offerValue(container, 'max_travelers'));
     const seatsRaw = offerValue(container, 'seats_available');
-    const availability = offerValue(container, 'availability');
+    const availability = offerValue(container, 'availability') || 'available';
     const price = priceRaw === '' ? null : Number(priceRaw);
     const discounted = discountRaw === '' ? null : Number(discountRaw);
-    if (!subjectId || !['package', 'service'].includes(subjectType)) throw new Error('اختر برنامجًا أو خدمة للعرض.');
-    if (!offerValue(container, 'destination_id') || !/^\d{4}-\d{2}$/.test(departure)) throw new Error('اختر الوجهة وشهر السفر.');
-    if (!Number.isInteger(minTravelers) || !Number.isInteger(maxTravelers) || minTravelers < 1 || maxTravelers < minTravelers) throw new Error('حدّد عدد المسافرين بشكل صحيح.');
-    if ((mode === 'fixed' || mode === 'starting_from') && (price === null || price < 0)) throw new Error('السعر الأساسي مطلوب لهذا النوع من التسعير.');
-    if (mode === 'discount' && (price === null || discounted === null || price < 0 || discounted < 0 || discounted >= price)) throw new Error('سعر الخصم يجب أن يكون أقل من السعر الأساسي.');
+    let mode = offerValue(container, 'price_mode') || 'fixed';
+    if (price === null && (mode === 'fixed' || mode === 'starting_from')) mode = 'quote';
+    if (!subjectId || !['package', 'service'].includes(subjectType)) throw new Error('اختر برنامجًا أو خدمة لعرض السعر.');
+    if (!offerValue(container, 'destination_id')) throw new Error('اختر وجهة عرض السعر.');
+    if (!/^\d{4}-\d{2}$/.test(departure)) throw new Error('اختر شهر السفر بصيغة صحيحة.');
+    if (!Number.isInteger(minTravelers) || !Number.isInteger(maxTravelers) || minTravelers < 1 || maxTravelers < minTravelers) throw new Error('حدّد نطاق المسافرين بشكل صحيح: الرقم الأدنى لا يتجاوز الأعلى.');
+    if (status === 'published' && (mode === 'fixed' || mode === 'starting_from') && (price === null || price < 0)) throw new Error('للنشر، أدخل السعر للفرد أو اختر «طلب عرض سعر» من الإعدادات المتقدمة.');
+    if (status === 'published' && mode === 'discount' && (price === null || discounted === null || price < 0 || discounted < 0 || discounted >= price)) throw new Error('للنشر بسعر مخفض، أدخل السعر الأساسي وسعر خصم أقل منه.');
     return {
       package_id: subjectType === 'package' ? subjectId : null,
       service_id: subjectType === 'service' ? subjectId : null,
       destination_id: offerValue(container, 'destination_id'),
-      trip_style: offerValue(container, 'trip_style'),
+      trip_style: offerValue(container, 'trip_style') || 'custom',
       departure_month: `${departure}-01`,
       min_travelers: minTravelers,
       max_travelers: maxTravelers,
@@ -535,29 +626,30 @@
       seats_available: availability === 'sold_out' ? 0 : (seatsRaw === '' ? null : Number(seatsRaw)),
       notes_ar: offerValue(container, 'notes_ar') || null,
       notes_en: offerValue(container, 'notes_en') || null,
-      status: statusOverride || offerValue(container, 'status'),
-      sort_order: Number(offerValue(container, 'sort_order') || 0)
+      status,
+      sort_order: Math.max(0, Number(offerValue(container, 'sort_order') || 0))
     };
   }
 
   function offerEditorBody(item) {
     const offer = item || { package_id: '', service_id: '', destination_id: '', trip_style: 'custom', departure_month: '', min_travelers: 1, max_travelers: 4, price_mode: 'fixed', price_amount: '', discounted_price_amount: '', availability: 'available', seats_available: '', status: 'draft', sort_order: 0, notes_ar: '', notes_en: '' };
-    return `<form id="offer-editor" class="form-grid" novalidate>
-      <div class="field full"><label for="field-subject">البرنامج أو الخدمة</label><select id="field-subject" class="select" data-offer-field="subject" required>${offerSubjectOptions(offer)}</select><span class="field-hint">كل عرض مرتبط ببرنامج واحد أو خدمة واحدة فقط.</span></div>
-      <div class="field"><label for="field-destination_id">الوجهة</label><select id="field-destination_id" class="select" data-offer-field="destination_id" required>${offerDestinationOptions(offer.destination_id)}</select></div>
+    const advanced = `
       <div class="field"><label for="field-trip_style">نوع الرحلة</label><select id="field-trip_style" class="select" data-offer-field="trip_style">${optionList(offerStyles, offer.trip_style)}</select></div>
-      <div class="field"><label for="field-departure_month">شهر السفر</label><input id="field-departure_month" class="input" data-offer-field="departure_month" type="month" value="${escapeHtml(departureMonth(offer.departure_month))}" required></div>
-      <div class="field"><label for="field-min_travelers">أقل عدد للمسافرين</label><input id="field-min_travelers" class="input" data-offer-field="min_travelers" type="number" min="1" value="${offer.min_travelers}" required></div>
-      <div class="field"><label for="field-max_travelers">أقصى عدد للمسافرين</label><input id="field-max_travelers" class="input" data-offer-field="max_travelers" type="number" min="1" value="${offer.max_travelers}" required></div>
-      <div class="field"><label for="field-price_mode">طريقة السعر</label><select id="field-price_mode" class="select" data-offer-field="price_mode">${optionList(offerModes, offer.price_mode)}</select></div>
-      <div class="field"><label for="field-price_amount">السعر للفرد (EGP)</label><input id="field-price_amount" class="input" data-offer-field="price_amount" type="number" min="0" step="0.01" value="${offer.price_amount ?? ''}"></div>
-      <div class="field"><label for="field-discounted_price_amount">سعر الخصم للفرد (EGP)</label><input id="field-discounted_price_amount" class="input" data-offer-field="discounted_price_amount" type="number" min="0" step="0.01" value="${offer.discounted_price_amount ?? ''}"></div>
-      <div class="field"><label for="field-availability">التوفر</label><select id="field-availability" class="select" data-offer-field="availability">${optionList(offerAvailability, offer.availability)}</select></div>
+      <div class="field"><label for="field-price_mode">طريقة السعر</label><select id="field-price_mode" class="select" data-offer-field="price_mode">${optionList(offerModes, offer.price_mode)}</select><span class="field-hint">اترك السعر فارغًا في المسودة ليصبح «طلب عرض سعر».</span></div>
+      <div class="field"><label for="field-discounted_price_amount">سعر الخصم للفرد (ج.م.)</label><input id="field-discounted_price_amount" class="input" data-offer-field="discounted_price_amount" type="number" min="0" step="0.01" value="${offer.discounted_price_amount ?? ''}"></div>
       <div class="field"><label for="field-seats_available">المقاعد المتاحة</label><input id="field-seats_available" class="input" data-offer-field="seats_available" type="number" min="0" value="${offer.seats_available ?? ''}"></div>
-      <div class="field"><label for="field-status">حالة النشر</label><select id="field-status" class="select" data-offer-field="status">${optionList(offerStatuses, offer.status)}</select></div>
       <div class="field"><label for="field-sort_order">ترتيب العرض</label><input id="field-sort_order" class="input" data-offer-field="sort_order" type="number" min="0" value="${offer.sort_order || 0}"></div>
-      <div class="field full"><label for="field-notes_ar">ملاحظات العرض بالعربية</label><textarea id="field-notes_ar" class="textarea" data-offer-field="notes_ar" placeholder="مثال: السعر لا يشمل التأشيرة.">${escapeHtml(offer.notes_ar || '')}</textarea></div>
-      <div class="field full"><label for="field-notes_en">Offer notes in English</label><textarea id="field-notes_en" class="textarea" data-offer-field="notes_en" dir="ltr" placeholder="Example: Visa fees are excluded.">${escapeHtml(offer.notes_en || '')}</textarea></div>
+      <div class="field full"><label for="field-notes_ar">ملاحظات العرض بالعربية</label><textarea id="field-notes_ar" class="textarea" data-offer-field="notes_ar">${escapeHtml(offer.notes_ar || '')}</textarea></div>
+      <div class="field full"><label for="field-notes_en">ملاحظات العرض بالإنجليزية</label><textarea id="field-notes_en" class="textarea" data-offer-field="notes_en" dir="ltr">${escapeHtml(offer.notes_en || '')}</textarea></div>`;
+    return `<form id="offer-editor" class="form-grid" novalidate>
+      <div class="field full"><label for="field-subject">البرنامج أو الخدمة</label><select id="field-subject" class="select" data-offer-field="subject">${offerSubjectOptions(offer)}</select></div>
+      <div class="field"><label for="field-destination_id">الوجهة</label><select id="field-destination_id" class="select" data-offer-field="destination_id">${offerDestinationOptions(offer.destination_id)}</select></div>
+      <div class="field"><label for="field-departure_month">شهر السفر</label><input id="field-departure_month" class="input" data-offer-field="departure_month" type="month" value="${escapeHtml(departureMonth(offer.departure_month))}"></div>
+      <div class="field"><label for="field-min_travelers">أقل عدد للمسافرين</label><input id="field-min_travelers" class="input" data-offer-field="min_travelers" type="number" min="1" value="${offer.min_travelers}"></div>
+      <div class="field"><label for="field-max_travelers">أقصى عدد للمسافرين</label><input id="field-max_travelers" class="input" data-offer-field="max_travelers" type="number" min="1" value="${offer.max_travelers}"></div>
+      <div class="field full"><label for="field-price_amount">السعر للفرد بالجنيه المصري</label><input id="field-price_amount" class="input" data-offer-field="price_amount" type="number" min="0" step="0.01" value="${offer.price_amount ?? ''}" placeholder="مثال: 45000"><span class="field-hint">العملة ثابتة: جنيه مصري، والوحدة ثابتة: لكل مسافر.</span></div>
+      <div class="field full"><label for="field-availability">حالة التوفر</label><select id="field-availability" class="select" data-offer-field="availability">${optionList(offerAvailability, offer.availability)}</select></div>
+      <div class="full">${advancedSection(advanced)}</div>
     </form>`;
   }
 
@@ -743,24 +835,49 @@
 
   function openBlogEditor(post) {
     const current = post || { status: 'draft', is_featured: false, sort_order: 0, excerpt_ar: '', excerpt_en: '', content_ar: '', content_en: '', featured_image_url: '', featured_image_alt_ar: '', featured_image_alt_en: '', seo_title_ar: '', seo_title_en: '', seo_description_ar: '', seo_description_en: '' };
-    const editor = `<form id="blog-editor" class="form-grid"><input type="hidden" name="slug" value="${escapeHtml(current.slug || '')}"><div class="field"><label for="blog-category">التصنيف</label><select id="blog-category" name="category_id" class="select" required>${blogCategoryOptions(current.category_id)}</select></div><div class="field"><label for="blog-title-ar">العنوان بالعربية</label><input id="blog-title-ar" name="title_ar" class="input" value="${escapeHtml(current.title_ar || '')}" required></div><div class="field"><label for="blog-title-en">العنوان بالإنجليزية</label><input id="blog-title-en" name="title_en" class="input" dir="ltr" value="${escapeHtml(current.title_en || '')}" required></div>${imageUploadField('blog_image_file', 'featured_image_url', current.featured_image_url, 'blog', 'صورة غلاف المقال')}<div class="field"><label for="blog-image-alt-ar">وصف الصورة بالعربية</label><input id="blog-image-alt-ar" name="featured_image_alt_ar" class="input" value="${escapeHtml(current.featured_image_alt_ar || '')}"></div><div class="field"><label for="blog-image-alt-en">وصف الصورة بالإنجليزية</label><input id="blog-image-alt-en" name="featured_image_alt_en" class="input" dir="ltr" value="${escapeHtml(current.featured_image_alt_en || '')}"></div><div class="field full"><label for="blog-excerpt-ar">الملخص بالعربية</label><textarea id="blog-excerpt-ar" name="excerpt_ar" class="textarea" required>${escapeHtml(current.excerpt_ar || '')}</textarea></div><div class="field full"><label for="blog-excerpt-en">الملخص بالإنجليزية</label><textarea id="blog-excerpt-en" name="excerpt_en" class="textarea" dir="ltr" required>${escapeHtml(current.excerpt_en || '')}</textarea></div><div class="field full"><label for="blog-content-ar">المقال بالعربية (Markdown آمن)</label><textarea id="blog-content-ar" name="content_ar" class="textarea" style="min-height:14rem" required>${escapeHtml(current.content_ar || '')}</textarea><span class="field-hint">يدعم العناوين والفقـرات والقوائم والروابط والاقتباسات والتأكيد، ولا يقبل HTML خامًا.</span></div><div class="field full"><label for="blog-content-en">المقال بالإنجليزية (Markdown آمن)</label><textarea id="blog-content-en" name="content_en" class="textarea" dir="ltr" style="min-height:14rem" required>${escapeHtml(current.content_en || '')}</textarea></div><div class="field"><label for="blog-seo-ar">عنوان SEO بالعربية</label><input id="blog-seo-ar" name="seo_title_ar" class="input" value="${escapeHtml(current.seo_title_ar || '')}"></div><div class="field"><label for="blog-seo-en">عنوان SEO بالإنجليزية</label><input id="blog-seo-en" name="seo_title_en" class="input" dir="ltr" value="${escapeHtml(current.seo_title_en || '')}"></div><div class="field"><label for="blog-seo-description-ar">وصف SEO بالعربية</label><textarea id="blog-seo-description-ar" name="seo_description_ar" class="textarea">${escapeHtml(current.seo_description_ar || '')}</textarea></div><div class="field"><label for="blog-seo-description-en">وصف SEO بالإنجليزية</label><textarea id="blog-seo-description-en" name="seo_description_en" class="textarea" dir="ltr">${escapeHtml(current.seo_description_en || '')}</textarea></div><div class="field"><label for="blog-sort">ترتيب الظهور</label><input id="blog-sort" name="sort_order" class="input" type="number" min="0" value="${Number(current.sort_order || 0)}"></div><div class="field full"><label class="check-label"><input type="checkbox" name="is_featured" ${current.is_featured ? 'checked' : ''}> <span>تعيين المقال كعنصر مميز عند النشر</span></label></div></form>`;
-    openDialog(post ? 'تعديل المقال' : 'مقال جديد', 'احفظ مسودة أولًا أو انشر بعد استكمال المحتوى الثنائي اللغة.', editor, `<button class="btn" type="button" data-close-dialog>إلغاء</button><button class="btn" type="button" data-action="save-blog" data-status="draft" data-id="${post?.id || ''}"><i class="fa-solid fa-floppy-disk"></i> حفظ مسودة</button><button class="btn btn-primary" type="button" data-action="save-blog" data-status="published" data-id="${post?.id || ''}"><i class="fa-solid fa-upload"></i> نشر</button>`);
+    const primary = `
+      <div class="field"><label for="blog-category">التصنيف</label><select id="blog-category" name="category_id" class="select" required>${blogCategoryOptions(current.category_id)}</select></div>
+      <div class="field"><label for="blog-title-ar">العنوان بالعربية</label><input id="blog-title-ar" name="title_ar" class="input" value="${escapeHtml(current.title_ar || '')}" required></div>
+      <div class="field full"><label for="blog-excerpt-ar">ملخص قصير بالعربية</label><textarea id="blog-excerpt-ar" name="excerpt_ar" class="textarea" required>${escapeHtml(current.excerpt_ar || '')}</textarea></div>
+      <div class="field full"><label for="blog-content-ar">المقال بالعربية</label><textarea id="blog-content-ar" name="content_ar" class="textarea" style="min-height:14rem" required>${escapeHtml(current.content_ar || '')}</textarea><span class="field-hint">يدعم Markdown الآمن للعناوين والفقرات والقوائم والروابط والاقتباسات.</span></div>
+      ${imageUploadField('blog_image_file', 'featured_image_url', current.featured_image_url, 'blog', 'صورة غلاف المقال')}`;
+    const advanced = `
+      ${englishField('العنوان بالإنجليزية', 'title_en', current.title_en, 'title_ar')}
+      ${englishField('الملخص بالإنجليزية', 'excerpt_en', current.excerpt_en, 'excerpt_ar', { textarea: true, full: true })}
+      ${englishField('المقال بالإنجليزية', 'content_en', current.content_en, 'content_ar', { textarea: true, full: true, style: 'min-height:14rem' })}
+      ${field('وصف الصورة بالعربية', 'featured_image_alt_ar', current.featured_image_alt_ar, { required: false })}
+      ${englishField('وصف الصورة بالإنجليزية', 'featured_image_alt_en', current.featured_image_alt_en, 'featured_image_alt_ar')}
+      ${field('عنوان SEO بالعربية', 'seo_title_ar', current.seo_title_ar, { required: false })}
+      ${englishField('عنوان SEO بالإنجليزية', 'seo_title_en', current.seo_title_en, 'seo_title_ar')}
+      ${field('وصف SEO بالعربية', 'seo_description_ar', current.seo_description_ar, { textarea: true, required: false })}
+      ${englishField('وصف SEO بالإنجليزية', 'seo_description_en', current.seo_description_en, 'seo_description_ar', { textarea: true })}
+      ${field('ترتيب الظهور', 'sort_order', Number(current.sort_order || 0), { type: 'number', required: false, step: '1' })}
+      ${checkField('تعيين المقال كعنصر مميز عند النشر', 'is_featured', current.is_featured)}`;
+    const editor = `<form id="blog-editor" class="form-grid" novalidate><input type="hidden" name="slug" value="${escapeHtml(current.slug || '')}">${primary}<div class="full">${advancedSection(advanced)}</div></form>`;
+    openDialog(post ? 'تعديل المقال' : 'مقال جديد', 'احفظ مسودة في أي وقت. عند النشر فقط يلزم استكمال المحتوى الثنائي اللغة والصورة.', editor, `<button class="btn" type="button" data-close-dialog>إلغاء</button><button class="btn" type="button" data-action="save-blog" data-status="draft" data-id="${post?.id || ''}"><i class="fa-solid fa-floppy-disk"></i> حفظ مسودة</button><button class="btn btn-primary" type="button" data-action="save-blog" data-status="published" data-id="${post?.id || ''}"><i class="fa-solid fa-upload"></i> نشر</button>`);
   }
 
   function blogPayload(form, status, existing) {
     const values = Object.fromEntries(new FormData(form).entries());
-    const slug = String(values.slug || '').trim().toLowerCase() || autoSlug(values.title_en, state.blog?.posts, 'article');
-    const required = ['title_ar', 'title_en', 'category_id'];
-    if (status === 'published') required.push('excerpt_ar', 'excerpt_en', 'content_ar', 'content_en');
-    if (required.some((field) => !String(values[field] || '').trim())) throw new Error('أكمل الحقول المطلوبة قبل النشر.');
-    // Image URLs are populated exclusively by the secure Supabase Storage uploader.
-    const uploadedImageUrl = String(values.featured_image_url || '').trim() || null;
-    return { slug, title_ar: values.title_ar.trim(), title_en: values.title_en.trim(), excerpt_ar: values.excerpt_ar.trim(), excerpt_en: values.excerpt_en.trim(), content_ar: values.content_ar.trim(), content_en: values.content_en.trim(), featured_image_url: uploadedImageUrl, featured_image_alt_ar: values.featured_image_alt_ar.trim() || null, featured_image_alt_en: values.featured_image_alt_en.trim() || null, category_id: values.category_id, status, is_featured: Boolean(form.querySelector('[name="is_featured"]')?.checked) && status === 'published', sort_order: Math.max(0, Number(values.sort_order || 0)), seo_title_ar: values.seo_title_ar.trim() || null, seo_title_en: values.seo_title_en.trim() || null, seo_description_ar: values.seo_description_ar.trim() || null, seo_description_en: values.seo_description_en.trim() || null, og_image_url: uploadedImageUrl, author_id: existing?.author_id || state.auth.session?.user?.id || null, updated_by: state.auth.session?.user?.id || null, ...(status === 'published' ? { published_at: existing?.published_at || new Date().toISOString() } : {}) };
+    const value = (field) => String(values[field] || '').trim();
+    const slug = value('slug').toLowerCase() || autoSlug(value('title_en'), state.blog?.posts, 'article');
+    const uploadedImageUrl = value('featured_image_url') || null;
+    return { slug, title_ar: value('title_ar'), title_en: value('title_en'), excerpt_ar: value('excerpt_ar'), excerpt_en: value('excerpt_en'), content_ar: value('content_ar'), content_en: value('content_en'), featured_image_url: uploadedImageUrl, featured_image_alt_ar: value('featured_image_alt_ar') || null, featured_image_alt_en: value('featured_image_alt_en') || null, category_id: value('category_id') || null, status, is_featured: Boolean(form.querySelector('[name="is_featured"]')?.checked) && status === 'published', sort_order: Math.max(0, Number(value('sort_order') || 0)), seo_title_ar: value('seo_title_ar') || null, seo_title_en: value('seo_title_en') || null, seo_description_ar: value('seo_description_ar') || null, seo_description_en: value('seo_description_en') || null, og_image_url: uploadedImageUrl, author_id: existing?.author_id || state.auth.session?.user?.id || null, updated_by: state.auth.session?.user?.id || null, ...(status === 'published' ? { published_at: existing?.published_at || new Date().toISOString() } : {}) };
+  }
+
+  function blogPublishIssues(payload) {
+    const fields = [
+      ['category_id', 'التصنيف'], ['title_ar', 'العنوان بالعربية'], ['title_en', 'العنوان بالإنجليزية'],
+      ['excerpt_ar', 'الملخص بالعربية'], ['excerpt_en', 'الملخص بالإنجليزية'], ['content_ar', 'المقال بالعربية'],
+      ['content_en', 'المقال بالإنجليزية'], ['featured_image_url', 'صورة غلاف المقال']
+    ];
+    return fields.filter(([key]) => !String(payload[key] || '').trim()).map(([, label]) => label);
   }
 
   async function saveBlog(button) {
     const dialog = button.closest('dialog');
     const form = dialog.querySelector('#blog-editor');
+    if (!form.reportValidity()) return;
     const existing = (state.blog?.posts || []).find((post) => post.id === button.dataset.id) || null;
     setButtonBusy(button, true);
     try {
@@ -771,7 +888,10 @@
         form.querySelector('[name="featured_image_url"]').value = upload.publicUrl;
       }
       const payload = blogPayload(form, button.dataset.status, existing);
-      if (button.dataset.status === 'published' && !payload.featured_image_url) throw new Error('ارفع صورة غلاف للمقال قبل النشر.');
+      if (button.dataset.status === 'published') {
+        const issues = blogPublishIssues(payload);
+        if (issues.length) throw new Error(`للنشر، أكمل: ${issues.join('، ')}.`);
+      }
       if (existing) await client.update('blog_posts', existing.id, payload); else await client.create('blog_posts', payload);
       dialog.close();
       showToast('success', button.dataset.status === 'published' ? 'تم نشر المقال' : 'تم حفظ المسودة', 'تُعرض المقالات المنشورة فقط للزائر.');
@@ -936,6 +1056,7 @@
     if (action === 'edit-item') { const row = (state.collections[target.dataset.kind] || []).find((item) => item.id === target.dataset.id); if (row) openItemEditor(target.dataset.kind, row); }
     if (action === 'preview') { const row = (state.collections[target.dataset.kind] || []).find((item) => item.id === target.dataset.id); if (row) openPreview(target.dataset.kind, row); }
     if (action === 'save-item') saveItem(target);
+    if (action === 'generate-english') generateEnglish(target);
     if (action === 'toggle-featured') updateItemAction(target.dataset.kind, target.dataset.id, 'featured');
     if (action === 'toggle-archive') { const row = (state.collections[target.dataset.kind] || []).find((item) => item.id === target.dataset.id); if (row) updateItemAction(target.dataset.kind, target.dataset.id, row.is_active ? 'archive' : 'restore'); }
     if (action === 'delete-item') deleteItem(target.dataset.kind, target.dataset.id);

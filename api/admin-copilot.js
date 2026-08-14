@@ -434,6 +434,31 @@ function parseModelOutput(payload) {
   try { return JSON.parse(raw.replace(/^```json\s*|\s*```$/g, '')); } catch { return null; }
 }
 
+async function translateToEnglish(text) {
+  const messages = [
+    {
+      role: 'system',
+      content: 'Translate the provided Arabic text into clear, natural English. Preserve line breaks, Markdown syntax, lists, names, numbers, currencies, and factual meaning. Return JSON only in exactly this shape: {"translation":"..."}. Do not add commentary or invent details.'
+    },
+    { role: 'user', content: text }
+  ];
+  let lastError = null;
+  for (const provider of providers()) {
+    try {
+      const response = await requestModel(provider, messages);
+      if (!response.ok) {
+        lastError = new Error(`Translation model request failed (${response.status})`);
+        continue;
+      }
+      const output = parseModelOutput(await response.json());
+      const translation = trimText(output?.translation, 24000);
+      if (translation) return translation;
+      lastError = new Error('Translation response was empty.');
+    } catch (error) { lastError = error; }
+  }
+  throw lastError || new Error('No translation provider is configured.');
+}
+
 function verifiedSourcesFromSnapshot(value, snapshot) {
   if (!Array.isArray(value)) return [];
   return value.slice(0, 6).map((item) => {
@@ -577,12 +602,21 @@ export default async function handler(req, res) {
     const auth = await requireAdmin(req);
     if (rateLimited(`admin:${auth.userId}`)) return res.status(429).json({ error: 'Rate limit exceeded', message: 'تم تجاوز حد طلبات المساعد مؤقتاً.' });
     const body = safeJson(req.body);
-    const mode = body.mode === 'execute' ? 'execute' : 'chat';
+    const mode = body.mode === 'execute' || body.mode === 'translate' ? body.mode : 'chat';
     const attachments = cleanAttachments(body.attachments);
     const trustedImageUrls = attachments.map((item) => item.url);
     const document = cleanDocument(body.document);
     const pageContext = cleanPageContext(body.pageContext);
     const requestId = UUID_PATTERN.test(String(body.requestId || '')) ? String(body.requestId) : null;
+
+    if (mode === 'translate') {
+      const text = trimText(body.text, 24000);
+      if (!text) return res.status(400).json({ error: 'Validation error', message: 'أدخل النص العربي المطلوب توليده بالإنجليزية.' });
+      if (body.targetLang !== 'en') return res.status(400).json({ error: 'Validation error', message: 'الترجمة التلقائية متاحة للإنجليزية فقط في هذا الإصدار.' });
+      const translation = await translateToEnglish(text);
+      audit('admin_translation', { userId: auth.userId, characters: text.length, targetLang: 'en' });
+      return res.status(200).json({ ok: true, translation });
+    }
 
     if (mode === 'execute') {
       if (body.confirmed !== true) return res.status(400).json({ error: 'Confirmation required', message: 'يلزم تأكيد الإجراء قبل تنفيذه.' });
