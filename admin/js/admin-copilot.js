@@ -3,7 +3,9 @@
 
   const API_PATH = '/api/admin-copilot';
   const storageKey = 'amwaj_admin_copilot_open';
-  const state = { open: false, busy: false, language: 'ar', history: [], pendingMutation: null, attachments: [] };
+  const MAX_DOCUMENT_BYTES = 5 * 1024 * 1024;
+  const MAX_DOCUMENT_TEXT = 24000;
+  const state = { open: false, busy: false, language: 'ar', history: [], pendingMutation: null, attachments: [], documentAttachment: null };
 
   const routes = Object.freeze({
     '/admin/': 'لوحة التحكم',
@@ -49,6 +51,7 @@
   function input() { return document.getElementById('admin-copilot-input'); }
   function submitButton() { return document.getElementById('admin-copilot-submit'); }
   function fileInput() { return document.getElementById('admin-copilot-file'); }
+  function documentInput() { return document.getElementById('admin-copilot-document'); }
   function attachmentTray() { return document.getElementById('admin-copilot-attachments'); }
 
   function shell() {
@@ -65,7 +68,7 @@
           <div class="admin-copilot-title"><span class="admin-copilot-avatar"><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i></span><span><strong>مساعد أمواج الإداري</strong><small><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> GPT-5.6 Luna · متصل بالبيانات الحية</small></span></div>
           <div class="admin-copilot-head-actions"><button type="button" class="admin-copilot-icon-button" data-copilot="language" aria-label="التبديل إلى الإنجليزية" title="Arabic / English">ع</button><button type="button" class="admin-copilot-icon-button" data-copilot="close" aria-label="إغلاق المساعد"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div>
         </header>
-        <div class="admin-copilot-notice"><i class="fa-solid fa-circle-info" aria-hidden="true"></i><span>ارفع الصورة كملف فقط ثم أنشئ برنامجاً بالمحادثة، أو اطلب أي تعديل. لن يُنفذ أي تغيير قبل تأكيدك.</span></div>
+        <div class="admin-copilot-notice"><i class="fa-solid fa-circle-info" aria-hidden="true"></i><span>ارفع صورة أو ملف Excel أو Word (.docx) ليحلله المساعد. لن يُنفذ أي تغيير قبل تأكيدك.</span></div>
         <div id="admin-copilot-messages" class="admin-copilot-messages" aria-live="polite" aria-relevant="additions text">
           <article class="copilot-message copilot-message-assistant"><div class="copilot-message-mark"><i class="fa-solid fa-sparkles" aria-hidden="true"></i></div><div class="copilot-message-body"><p>مرحباً. اسألني عن الأسعار أو المحتوى أو آراء العملاء، أو اطلب مني إعداد تعديل وسأعرضه عليك للتأكيد أولاً.</p></div></article>
         </div>
@@ -77,9 +80,11 @@
         <div id="admin-copilot-attachments" class="admin-copilot-attachments" aria-live="polite"></div>
         <form class="admin-copilot-composer" id="admin-copilot-form">
           <label class="sr-only" for="admin-copilot-input">اكتب طلبك لمساعد أمواج الإداري</label>
-          <input id="admin-copilot-file" class="admin-copilot-file-input" type="file" accept="image/jpeg,image/png,image/webp,image/avif" aria-label="رفع صورة للبرنامج">
-          <button class="admin-copilot-upload" type="button" data-copilot="upload-image" aria-label="رفع صورة للبرنامج" title="رفع صورة"><i class="fa-solid fa-image" aria-hidden="true"></i></button>
-          <textarea id="admin-copilot-input" rows="2" maxlength="4200" placeholder="مثال: أريد إضافة برنامج جديد بهذه الصورة" autocomplete="off"></textarea>
+          <input id="admin-copilot-file" class="admin-copilot-file-input" type="file" accept="image/jpeg,image/png,image/webp,image/avif" aria-label="رفع صورة">
+          <input id="admin-copilot-document" class="admin-copilot-file-input" type="file" accept=".xlsx,.xls,.csv,.docx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv,application/vnd.openxmlformats-officedocument.wordprocessingml.document" aria-label="رفع ملف Excel أو Word">
+          <button class="admin-copilot-upload" type="button" data-copilot="upload-image" aria-label="رفع صورة" title="رفع صورة"><i class="fa-solid fa-image" aria-hidden="true"></i></button>
+          <button class="admin-copilot-upload admin-copilot-upload-document" type="button" data-copilot="upload-document" aria-label="رفع ملف Excel أو Word" title="رفع Excel أو Word"><i class="fa-solid fa-file-arrow-up" aria-hidden="true"></i></button>
+          <textarea id="admin-copilot-input" rows="2" maxlength="4200" placeholder="مثال: حلّل ملف الأسعار المرفق واقترح التحديث المناسب" autocomplete="off"></textarea>
           <button id="admin-copilot-submit" class="admin-copilot-send" type="submit" aria-label="إرسال الطلب"><i class="fa-solid fa-arrow-up" aria-hidden="true"></i></button>
         </form>
       </section>`;
@@ -157,7 +162,24 @@
       card.append(preview, label, remove);
       tray.append(card);
     });
-    tray.hidden = !state.attachments.length;
+    if (state.documentAttachment) {
+      const attachment = state.documentAttachment;
+      const card = document.createElement('div');
+      card.className = 'admin-copilot-attachment admin-copilot-document';
+      const preview = document.createElement('span');
+      preview.className = 'admin-copilot-document-icon';
+      preview.innerHTML = `<i class="fa-solid ${attachment.kind === 'excel' ? 'fa-file-excel' : 'fa-file-word'}" aria-hidden="true"></i>`;
+      const label = document.createElement('span');
+      label.textContent = attachment.name;
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.dataset.copilot = 'remove-document';
+      remove.setAttribute('aria-label', 'إزالة الملف المرفق');
+      remove.innerHTML = '<i class="fa-solid fa-xmark" aria-hidden="true"></i>';
+      card.append(preview, label, remove);
+      tray.append(card);
+    }
+    tray.hidden = !state.attachments.length && !state.documentAttachment;
   }
 
   async function uploadAttachment(file) {
@@ -181,6 +203,65 @@
     }
   }
 
+  function tidyDocumentText(value, max = 600) {
+    return String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
+  }
+
+  function cutDocumentText(value) {
+    const textValue = String(value || '').trim();
+    return textValue.length > MAX_DOCUMENT_TEXT ? `${textValue.slice(0, MAX_DOCUMENT_TEXT)}\n\n[تم اختصار بقية الملف لحماية سعة المحادثة]` : textValue;
+  }
+
+  function documentKind(file) {
+    const name = String(file?.name || '').toLowerCase();
+    if (/\.(xlsx|xls|csv)$/.test(name)) return 'excel';
+    if (/\.docx$/.test(name)) return 'word';
+    return '';
+  }
+
+  async function extractDocument(file) {
+    if (!(file instanceof File)) throw new Error('اختر ملفاً صالحاً أولاً.');
+    if (file.size > MAX_DOCUMENT_BYTES) throw new Error('الحد الأقصى لملف Excel أو Word هو 5 ميجابايت.');
+    const kind = documentKind(file);
+    if (!kind) throw new Error('الصيغ المدعومة هي Excel ‏(.xlsx و.xls و.csv) وWord ‏(.docx) فقط.');
+    const arrayBuffer = await file.arrayBuffer();
+    if (kind === 'excel') {
+      if (!window.XLSX) throw new Error('تعذر تحميل محلل Excel. حدّث الصفحة ثم حاول مرة أخرى.');
+      const workbook = window.XLSX.read(arrayBuffer, { type: 'array', cellFormula: false, cellHTML: false, cellText: true });
+      const sections = workbook.SheetNames.slice(0, 5).map((sheetName) => {
+        const rows = window.XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, defval: '', raw: false, blankrows: false })
+          .slice(0, 121)
+          .map((row) => row.map((cell) => tidyDocumentText(cell, 240)).join(' | '))
+          .filter(Boolean);
+        return rows.length ? `[ورقة: ${tidyDocumentText(sheetName, 100)}]\n${rows.join('\n')}` : '';
+      }).filter(Boolean);
+      const content = cutDocumentText(sections.join('\n\n'));
+      if (!content) throw new Error('ملف Excel لا يحتوي على بيانات قابلة للقراءة.');
+      return { kind, name: tidyDocumentText(file.name, 180), mimeType: file.type || 'application/vnd.ms-excel', content };
+    }
+    if (!window.mammoth) throw new Error('تعذر تحميل محلل Word. حدّث الصفحة ثم حاول مرة أخرى.');
+    const result = await window.mammoth.extractRawText({ arrayBuffer });
+    const content = cutDocumentText(String(result.value || '').split(/\n+/).map((line) => tidyDocumentText(line, 1200)).filter(Boolean).join('\n'));
+    if (!content) throw new Error('ملف Word لا يحتوي على نص قابل للقراءة.');
+    return { kind, name: tidyDocumentText(file.name, 180), mimeType: file.type || 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', content };
+  }
+
+  async function uploadDocument(file) {
+    if (state.busy) return;
+    setBusy(true);
+    try {
+      state.documentAttachment = await extractDocument(file);
+      renderAttachments();
+      appendMessage('assistant', `تمت قراءة ملف «${state.documentAttachment.name}» في المتصفح ولم يُحفظ كملف على الموقع. اكتب المطلوب منه، مثل: «حلّل الأسعار واقترح التحديث المناسب». سأعرض أي تعديل للمراجعة والتأكيد أولاً.`);
+    } catch (error) {
+      appendMessage('assistant', error.message || 'تعذر قراءة الملف.');
+    } finally {
+      if (documentInput()) documentInput().value = '';
+      setBusy(false);
+      input()?.focus();
+    }
+  }
+
   function appendTyping() {
     const list = messages();
     if (!list) return;
@@ -198,12 +279,14 @@
     state.busy = busy;
     const button = submitButton();
     const field = input();
-    const upload = document.querySelector('.admin-copilot-upload');
+    const uploads = document.querySelectorAll('.admin-copilot-upload');
     const picker = fileInput();
+    const documentPicker = documentInput();
     if (button) { button.disabled = busy; button.setAttribute('aria-busy', String(busy)); }
     if (field) field.disabled = busy;
-    if (upload) upload.disabled = busy;
+    uploads.forEach((upload) => { upload.disabled = busy; });
     if (picker) picker.disabled = busy;
+    if (documentPicker) documentPicker.disabled = busy;
   }
 
   async function adminToken() {
@@ -236,7 +319,7 @@
     setBusy(true);
     appendTyping();
     try {
-      const result = await request({ mode: 'chat', message, history: state.history.slice(0, -1), language: state.language, attachments: state.attachments });
+      const result = await request({ mode: 'chat', message, history: state.history.slice(0, -1), language: state.language, attachments: state.attachments, document: state.documentAttachment });
       const reply = result.reply || {};
       appendMessage('assistant', text(reply.answer, 'لم أتمكن من استخراج إجابة موثوقة الآن.'), reply);
       state.history.push({ role: 'assistant', content: text(reply.answer) });
@@ -310,12 +393,18 @@
       }
       if (command === 'confirm-mutation') executePendingMutation();
       if (command === 'upload-image') fileInput()?.click();
+      if (command === 'upload-document') documentInput()?.click();
       if (command === 'remove-attachment') {
         const index = Number(event.target.closest('[data-attachment-index]')?.dataset.attachmentIndex);
         if (Number.isInteger(index) && index >= 0) {
           state.attachments.splice(index, 1);
           renderAttachments();
         }
+      }
+      if (command === 'remove-document') {
+        state.documentAttachment = null;
+        renderAttachments();
+        appendMessage('assistant', 'تمت إزالة الملف المرفق. لم يُرسل أي محتوى منه إلى المساعد بعد.');
       }
       if (command === 'cancel-mutation') {
         state.pendingMutation = null;
@@ -328,8 +417,8 @@
       if (nav) navigate(nav);
     });
     document.addEventListener('change', (event) => {
-      if (event.target?.id !== 'admin-copilot-file') return;
-      uploadAttachment(event.target.files?.[0]);
+      if (event.target?.id === 'admin-copilot-file') uploadAttachment(event.target.files?.[0]);
+      if (event.target?.id === 'admin-copilot-document') uploadDocument(event.target.files?.[0]);
     });
     document.addEventListener('submit', (event) => {
       if (event.target?.id !== 'admin-copilot-form') return;

@@ -415,6 +415,9 @@ body { overflow-x: hidden; }
 .admin-copilot-attachments[hidden] { display: none; }
 .admin-copilot-attachment { display: grid; grid-template-columns: 2.25rem minmax(5.5rem, 1fr) 1.65rem; flex: 0 0 min(15.5rem, 78vw); align-items: center; gap: .45rem; min-block-size: 3rem; padding: .35rem; border: 1px solid #b9e0eb; border-radius: .7rem; color: #315563; background: #f1fbff; font-size: .68rem; }
 .admin-copilot-attachment img { inline-size: 2.25rem; block-size: 2.25rem; border-radius: .45rem; object-fit: cover; background: #dceef3; }
+.admin-copilot-document { border-color: #cfe3d4; color: #315a41; background: #f2fbf4; }
+.admin-copilot-document-icon { display: grid; place-items: center; inline-size: 2.25rem; block-size: 2.25rem; overflow: visible !important; border-radius: .45rem; color: #167a3d; background: #e0f2e5; font-size: 1.15rem; }
+.admin-copilot-document-icon .fa-file-word { color: #1d5fa7; }
 .admin-copilot-attachment span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
 .admin-copilot-attachment button { display: grid; place-items: center; inline-size: 1.65rem; block-size: 1.65rem; padding: 0; border: 0; border-radius: .45rem; color: #6e8791; background: transparent; cursor: pointer; }
 .admin-copilot-attachment button:hover { color: #b42318; background: #fee4e2; }
