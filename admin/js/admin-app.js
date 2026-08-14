@@ -311,6 +311,55 @@
     }
   }
 
+  async function generateDerivedFields(button) {
+    const dialog = button.closest('dialog');
+    const title = String(dialog?.querySelector('[name="title_ar"]')?.value || '').trim();
+    const description = String(dialog?.querySelector('[name="description_ar"]')?.value || '').trim();
+    const altField = dialog?.querySelector('[name="image_alt_ar"]');
+    const highlightsField = dialog?.querySelector('[name="highlights"]');
+    if (!title && !description) {
+      showToast('error', 'أدخل المحتوى العربي أولًا', 'اكتب عنوانًا أو وصفًا بالعربية قبل توليد الحقول المساعدة.');
+      dialog?.querySelector('[name="title_ar"]')?.focus();
+      return;
+    }
+    if (!altField && !highlightsField) return;
+    const session = await client.getValidSession();
+    if (!session?.access_token) {
+      showToast('error', 'انتهت الجلسة', 'سجّل الدخول مرة أخرى ثم أعد المحاولة.');
+      return;
+    }
+    const original = button.innerHTML;
+    try {
+      setButtonBusy(button, true);
+      button.innerHTML = '<i class="fa-solid fa-spinner"></i> جارٍ التوليد…';
+      const response = await fetch('/api/admin-copilot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ mode: 'derive', title, description })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result?.derived) throw new Error(result?.message || 'تعذر توليد الحقول المساعدة حالياً.');
+      let filled = 0;
+      if (altField && !String(altField.value || '').trim() && result.derived.image_alt_ar) {
+        altField.value = result.derived.image_alt_ar;
+        altField.dispatchEvent(new Event('input', { bubbles: true }));
+        filled += 1;
+      }
+      if (highlightsField && !String(highlightsField.value || '').trim() && Array.isArray(result.derived.highlights) && result.derived.highlights.length) {
+        highlightsField.value = result.derived.highlights.join('\n');
+        highlightsField.dispatchEvent(new Event('input', { bubbles: true }));
+        filled += 1;
+      }
+      if (filled) showToast('success', 'تم توليد الحقول المساعدة', 'راجِع النص البديل والمزايا قبل الحفظ. لم نستبدل أي تعديل يدوي موجود.');
+      else showToast('info', 'تم الحفاظ على تعديلاتك', 'الحقول المساعدة تحتوي قيمًا بالفعل، لذلك لم نستبدلها.');
+    } catch (error) {
+      showToast('error', 'تعذر توليد الحقول المساعدة', error.message);
+    } finally {
+      button.innerHTML = original;
+      setButtonBusy(button, false);
+    }
+  }
+
   function openDialog(title, subtitle, body, footer) {
     const dialog = document.createElement('dialog');
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -381,6 +430,7 @@
       ${englishField('العنوان بالإنجليزية', 'title_en', item.title_en, 'title_ar')}
       ${englishField('الوصف بالإنجليزية', 'description_en', item.description_en, 'description_ar', { textarea: true, full: true })}
       ${englishField('السعر أو وصف السعر بالإنجليزية', 'price_label_en', editorValue(item.price_label_en, draftFallbacks.priceLabelEn), 'price_label_ar', { full: true })}
+      <div class="field full derived-fields-control"><div class="field-heading"><strong>حقول مساعدة من المحتوى العربي</strong><button class="btn btn-small btn-translate" type="button" data-action="generate-derived"><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i> توليد تلقائي</button></div><span class="field-hint">يستخرج نصًا بديلًا ومزايا من المحتوى الذي أدخلته فقط، ولا يستبدل تعديلاتك اليدوية.</span></div>
       ${field('النص البديل بالعربية', 'image_alt_ar', item.image_alt_ar, { required: false })}
       ${englishField('النص البديل بالإنجليزية', 'image_alt_en', item.image_alt_en, 'image_alt_ar')}
       ${field('شارة بالعربية', 'badge_ar', item.badge_ar, { required: false })}
@@ -742,7 +792,7 @@
 
   function reviewRows(reviews) {
     if (!reviews.length) return '<div class="empty-state"><div><i class="fa-solid fa-comments"></i><h3>لا توجد آراء واردة</h3><p>ستظهر آراء الزوار المرسلة من الموقع العام هنا للمراجعة.</p></div></div>';
-    return `<div class="table-scroll"><table><thead><tr><th>العميل والرأي</th><th>التقييم</th><th>الحالة</th><th>تاريخ الإرسال</th><th><span class="sr-only">إجراءات</span></th></tr></thead><tbody>${reviews.map((review) => `<tr><td><strong>${escapeHtml(review.customer_name)}</strong><p class="review-admin-copy">${escapeHtml(review.review_text)}</p></td><td>${reviewStars(review.rating)}</td><td>${reviewStatusMarkup(review)}</td><td><span class="muted">${formatDate(review.submitted_at)}</span></td><td><div class="table-actions">${review.status !== 'approved' ? `<button class="btn btn-small" data-action="approve-review" data-id="${review.id}" aria-label="اعتماد الرأي"><i class="fa-solid fa-check"></i></button>` : ''}${review.status !== 'rejected' ? `<button class="btn btn-small" data-action="reject-review" data-id="${review.id}" aria-label="رفض الرأي"><i class="fa-solid fa-ban"></i></button>` : ''}<button class="btn btn-small btn-danger" data-action="delete-review" data-id="${review.id}" aria-label="حذف الرأي"><i class="fa-solid fa-trash"></i></button></div></td></tr>`).join('')}</tbody></table></div>`;
+    return `<div class="table-scroll"><table><thead><tr><th>العميل والرأي</th><th>التقييم</th><th>الحالة</th><th>تاريخ الإرسال</th><th><span class="sr-only">إجراءات</span></th></tr></thead><tbody>${reviews.map((review) => `<tr><td><strong>${escapeHtml(review.customer_name)}</strong><p class="review-admin-copy">${escapeHtml(review.review_text)}</p></td><td>${reviewStars(review.rating)}</td><td>${reviewStatusMarkup(review)}</td><td><span class="muted">${formatDate(review.submitted_at)}</span></td><td><div class="table-actions"><button class="btn btn-small" data-action="edit-review" data-id="${review.id}" aria-label="مراجعة وتعديل الرأي"><i class="fa-solid fa-pen"></i></button>${review.status !== 'approved' ? `<button class="btn btn-small" data-action="approve-review" data-id="${review.id}" aria-label="اعتماد الرأي"><i class="fa-solid fa-check"></i></button>` : ''}${review.status !== 'rejected' ? `<button class="btn btn-small" data-action="reject-review" data-id="${review.id}" aria-label="رفض الرأي"><i class="fa-solid fa-ban"></i></button>` : ''}<button class="btn btn-small btn-danger" data-action="delete-review" data-id="${review.id}" aria-label="حذف الرأي"><i class="fa-solid fa-trash"></i></button></div></td></tr>`).join('')}</tbody></table></div>`;
   }
 
   async function renderReviews() {
@@ -753,13 +803,53 @@
       const pending = reviews.filter((review) => review.status === 'pending').length;
       const approved = reviews.filter((review) => review.status === 'approved').length;
       const rejected = reviews.filter((review) => review.status === 'rejected').length;
-      const content = `${pageHeader('آراء العملاء', 'اعتمد الرأي الموثوق ليظهر في الموقع العام، أو ارفضه أو احذفه نهائيًا.', `<span class="badge badge-draft"><i class="fa-solid fa-hourglass-half"></i> ${pending} بانتظار المراجعة</span>`)}<section class="panel table-card"><div class="panel-head"><div><h3 class="panel-title">سجل مراجعات الزوار</h3><p class="panel-subtitle">يُعرض للعامة فقط ما يحمل حالة «معتمد».</p></div><div style="display:flex;gap:.45rem;flex-wrap:wrap"><span class="badge badge-published">${approved} معتمد</span><span class="badge badge-archived">${rejected} مرفوض</span></div></div><div class="toolbar"><div class="search-wrap"><i class="fa-solid fa-magnifying-glass"></i><input id="reviews-search" class="input" type="search" placeholder="ابحث بالاسم أو نص الرأي…"></div><span class="muted">${reviews.length} رأي</span></div><div id="reviews-table">${reviewRows(reviews)}</div></section>`;
+      const content = `${pageHeader('آراء العملاء', 'اعتمد الرأي الموثوق ليظهر في الموقع العام، أو ارفضه أو احذفه نهائيًا.', `<div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap"><span class="badge badge-draft"><i class="fa-solid fa-hourglass-half"></i> ${pending} بانتظار المراجعة</span><button class="btn btn-primary" type="button" data-action="new-review"><i class="fa-solid fa-plus"></i> إضافة رأي</button></div>`)}<section class="panel table-card"><div class="panel-head"><div><h3 class="panel-title">سجل مراجعات الزوار</h3><p class="panel-subtitle">يُعرض للعامة فقط ما يحمل حالة «معتمد».</p></div><div style="display:flex;gap:.45rem;flex-wrap:wrap"><span class="badge badge-published">${approved} معتمد</span><span class="badge badge-archived">${rejected} مرفوض</span></div></div><div class="toolbar"><div class="search-wrap"><i class="fa-solid fa-magnifying-glass"></i><input id="reviews-search" class="input" type="search" placeholder="ابحث بالاسم أو نص الرأي…"></div><span class="muted">${reviews.length} رأي</span></div><div id="reviews-table">${reviewRows(reviews)}</div></section>`;
       app.innerHTML = layout(content);
       document.getElementById('reviews-search')?.addEventListener('input', (event) => {
         const term = event.target.value.toLowerCase().trim();
         document.getElementById('reviews-table').innerHTML = reviewRows(reviews.filter((review) => `${review.customer_name} ${review.review_text}`.toLowerCase().includes(term)));
       });
     } catch (error) { app.innerHTML = layout(`${pageHeader('آراء العملاء', '')}${errorMarkup(error.message)}`); }
+  }
+
+  function reviewStatusOptions(selected) {
+    return ['pending', 'approved', 'rejected'].map((status) => `<option value="${status}" ${status === selected ? 'selected' : ''}>${status === 'pending' ? 'قيد المراجعة' : status === 'approved' ? 'معتمد' : 'مرفوض'}</option>`).join('');
+  }
+
+  function openReviewEditor(review = null) {
+    const isNew = !review;
+    const value = review || { customer_name: '', rating: 5, review_text: '', status: 'pending', is_featured: false };
+    const advanced = `<label class="field checkbox-field"><input type="checkbox" name="is_featured" ${value.is_featured ? 'checked' : ''}> <span>إبراز هذا الرأي في الموقع</span></label>`;
+    const statusControl = isNew
+      ? `<input type="hidden" name="status" value="pending"><div class="field"><label>حالة المراجعة</label><div class="input input-readonly">قيد المراجعة</div><span class="field-hint">احفظ الرأي أولًا، ثم راجعه واعتمده أو ارفضه.</span></div>`
+      : `<div class="field"><label for="review-status">حالة المراجعة</label><select id="review-status" class="select" name="status">${reviewStatusOptions(value.status || 'pending')}</select><span class="field-hint">المعتمد فقط يظهر في الموقع العام.</span></div>`;
+    const footer = isNew
+      ? `<button class="btn" type="button" data-close-dialog>إلغاء</button><button class="btn btn-primary" type="button" data-action="save-review"><i class="fa-solid fa-floppy-disk"></i> حفظ للمراجعة</button>`
+      : `<button class="btn" type="button" data-close-dialog>إلغاء</button><button class="btn" type="button" data-action="save-review" data-id="${review.id}"><i class="fa-solid fa-floppy-disk"></i> حفظ</button><button class="btn btn-primary" type="button" data-action="save-review" data-status="approved" data-id="${review.id}"><i class="fa-solid fa-check"></i> اعتماد</button><button class="btn" type="button" data-action="save-review" data-status="rejected" data-id="${review.id}"><i class="fa-solid fa-ban"></i> رفض</button>`;
+    openDialog(isNew ? 'إضافة رأي للمراجعة' : `مراجعة رأي: ${value.customer_name}`, isNew ? 'احفظ الرأي كـ«قيد المراجعة» ثم اعتمده فقط عندما يكون مناسبًا للنشر.' : 'راجع النص والتقييم والحالة. لا يظهر للعامة إلا الرأي المعتمد.', `<form id="review-editor" class="form-grid"><div class="field"><label for="review-customer-name">اسم العميل</label><input id="review-customer-name" class="input" name="customer_name" value="${escapeHtml(value.customer_name || '')}" required maxlength="120"></div><div class="field"><label for="review-rating">التقييم</label><select id="review-rating" class="select" name="rating" required>${[5,4,3,2,1].map((rating) => `<option value="${rating}" ${Number(value.rating) === rating ? 'selected' : ''}>${rating} من 5</option>`).join('')}</select></div><div class="field full"><label for="review-text">رأي العميل</label><textarea id="review-text" class="textarea" name="review_text" required maxlength="1500" placeholder="اكتب تجربة العميل باختصار…">${escapeHtml(value.review_text || '')}</textarea></div>${statusControl}${advancedSettingsMarkup(advanced, 'خيارات إضافية')}</form>`, footer);
+  }
+
+  async function saveReview(button) {
+    const dialog = button.closest('dialog');
+    const form = dialog.querySelector('#review-editor');
+    if (!form.reportValidity()) return;
+    const existing = (state.reviews || []).find((item) => item.id === button.dataset.id) || null;
+    const chosenStatus = button.dataset.status || form.elements.status.value;
+    const payload = {
+      customer_name: form.elements.customer_name.value.trim(),
+      rating: Number(form.elements.rating.value),
+      review_text: form.elements.review_text.value.trim(),
+      status: chosenStatus,
+      is_featured: Boolean(form.elements.is_featured.checked),
+      reviewed_at: chosenStatus === 'pending' ? null : (existing?.reviewed_at || new Date().toISOString())
+    };
+    try {
+      setButtonBusy(button, true);
+      if (existing) await client.update('customer_reviews', existing.id, payload); else await client.create('customer_reviews', { ...payload, submitted_at: new Date().toISOString() });
+      dialog.close();
+      showToast('success', chosenStatus === 'approved' ? 'تم اعتماد الرأي' : chosenStatus === 'rejected' ? 'تم رفض الرأي' : 'تم حفظ الرأي للمراجعة', chosenStatus === 'approved' ? 'أصبح الرأي ظاهرًا في الموقع العام.' : 'يمكنك اعتماده أو رفضه لاحقًا.');
+      await renderReviews();
+    } catch (error) { showToast('error', 'تعذر حفظ الرأي', error.message); setButtonBusy(button, false); }
   }
 
   async function updateReviewStatus(id, status) {
@@ -786,29 +876,78 @@
     } catch (error) { showToast('error', 'تعذر حذف الرأي', error.message); }
   }
 
+  const SETTING_PRESENTATION = Object.freeze({
+    company_identity: { title: 'هوية الشركة', description: 'الاسم والبيانات التنظيمية الأساسية للشركة.' },
+    contact: { title: 'بيانات التواصل', description: 'وسائل تواصل العملاء والعناوين المعروضة في الموقع.' },
+    location: { title: 'موقع الشركة', description: 'المدينة والإحداثيات ورابط الخريطة.' },
+    site_meta: { title: 'بيانات ظهور الموقع', description: 'عنوان الموقع ووصفه والرابط الأساسي لمحركات البحث.' },
+    social_links: { title: 'الروابط الرسمية', description: 'روابط القنوات والمنصات الرسمية للشركة.' }
+  });
+
+  const SETTING_FIELD_LABELS = Object.freeze({
+    name_ar: 'الاسم بالعربية', name_en: 'الاسم بالإنجليزية', incorporation_date: 'تاريخ التأسيس', chairman: 'رئيس مجلس الإدارة', chairman_ar: 'رئيس مجلس الإدارة بالعربية', chairman_en: 'رئيس مجلس الإدارة بالإنجليزية', etaa_membership: 'عضوية ETAA', licence_number: 'رقم الترخيص', license_number: 'رقم الترخيص', licence_category: 'فئة الترخيص', license_category: 'فئة الترخيص', responsible_manager: 'المدير المسؤول', email: 'البريد الإلكتروني', landline: 'الهاتف الأرضي', phone: 'رقم الهاتف', address_ar: 'العنوان بالعربية', address_en: 'العنوان بالإنجليزية', whatsapp_numbers: 'أرقام واتساب', city_ar: 'المدينة بالعربية', city_en: 'المدينة بالإنجليزية', latitude: 'خط العرض', longitude: 'خط الطول', map_embed_url: 'رابط الخريطة', title: 'عنوان الصفحة', canonical_url: 'الرابط الأساسي', description_ar: 'الوصف بالعربية', website: 'الموقع الإلكتروني', facebook: 'Facebook', whatsapp: 'WhatsApp', etaa: 'ETAA'
+  });
+
+  const SETTING_ADVANCED_FIELDS = Object.freeze({
+    company_identity: ['incorporation_date', 'chairman', 'chairman_ar', 'chairman_en', 'etaa_membership', 'etaa', 'licence_number', 'license_number', 'licence_category', 'license_category', 'responsible_manager'],
+    contact: [],
+    location: ['latitude', 'longitude', 'map_embed_url'],
+    site_meta: ['canonical_url'],
+    social_links: []
+  });
+
+  function settingLabel(key) { return SETTING_FIELD_LABELS[key] || key.replace(/[_-]+/g, ' '); }
+  function settingPresentation(setting) { return SETTING_PRESENTATION[setting.setting_key] || { title: setting.setting_key.replace(/[_-]+/g, ' '), description: setting.is_public ? 'إعداد عام معروض في الموقع.' : 'إعداد إداري خاص.' }; }
+  function settingSummary(value) { return Object.entries(value || {}).slice(0, 3).map(([key, item]) => `<span><strong>${escapeHtml(settingLabel(key))}:</strong> ${escapeHtml(Array.isArray(item) ? item.join('، ') : String(item ?? '—'))}</span>`).join(''); }
+  function settingInputType(key, value) {
+    if (typeof value === 'number') return 'number';
+    if (/email/i.test(key)) return 'email';
+    if (/whatsapp_numbers|phone|landline/i.test(key)) return 'tel';
+    if (/url|website|facebook|map_embed/i.test(key)) return 'url';
+    if (/date/i.test(key)) return 'date';
+    return 'text';
+  }
+  function splitSettingFields(setting) {
+    const advancedKeys = new Set(SETTING_ADVANCED_FIELDS[setting.setting_key] || []);
+    return Object.entries(setting.value || {}).reduce((groups, entry) => {
+      groups[advancedKeys.has(entry[0]) ? 'advanced' : 'primary'].push(entry);
+      return groups;
+    }, { primary: [], advanced: [] });
+  }
+  function settingFieldMarkup(key, value) {
+    const label = settingLabel(key); const id = `setting-${key.replace(/[^a-z0-9_-]/gi, '-')}`; const isArray = Array.isArray(value); const long = /address|description/i.test(key);
+    if (typeof value === 'boolean') return `<label class="field checkbox-field"><input id="${id}" type="checkbox" data-setting-field="${escapeHtml(key)}" ${value ? 'checked' : ''}> <span>${escapeHtml(label)}</span></label>`;
+    const normalized = isArray ? value.join(', ') : String(value ?? '');
+    return `<div class="field ${long ? 'full' : ''}"><label for="${id}">${escapeHtml(label)}</label>${long ? `<textarea id="${id}" class="textarea" data-setting-field="${escapeHtml(key)}">${escapeHtml(normalized)}</textarea>` : `<input id="${id}" class="input" type="${settingInputType(key, value)}" data-setting-field="${escapeHtml(key)}" value="${escapeHtml(normalized)}" ${typeof value === 'number' ? 'step="any"' : ''}>`}${isArray ? '<span class="field-hint">افصل القيم بفاصلة.</span>' : ''}</div>`;
+  }
+
   async function renderSettings() {
-    app.innerHTML = layout(`${pageHeader('إعدادات الموقع', 'الإعدادات الحالية من Supabase فقط.')}${loadingMarkup('جارٍ تحميل الإعدادات…')}`);
+    app.innerHTML = layout(`${pageHeader('إعدادات الموقع', 'حدّث بيانات العمل من حقول واضحة، من دون التعامل مع JSON تقني.')}${loadingMarkup('جارٍ تحميل الإعدادات…')}`);
     try {
       const settings = await client.list('site_settings', { order: 'setting_key.asc' });
       state.collections.settings = settings;
-      const content = `${pageHeader('إعدادات الموقع', 'الإعدادات الحالية من Supabase فقط.')}
-        <section class="panel"><div class="panel-head"><div><h3 class="panel-title">الإعدادات المسجلة</h3><p class="panel-subtitle">حدّث قيمة JSON بحذر للحفاظ على بنية بيانات الموقع الحالية.</p></div><span class="badge badge-active"><i class="fa-solid fa-database"></i> مصدر مركزي</span></div>
-          ${settings.length ? `<div style="display:grid;gap:1rem;margin-top:1rem">${settings.map((item) => `<article class="editor-card" style="padding:1rem"><div class="panel-head"><div><h4 style="margin:0">${escapeHtml(item.setting_key)}</h4><p class="panel-subtitle">${item.is_public ? 'إعداد عام قابل للقراءة' : 'إعداد إداري خاص'}</p></div><button class="btn btn-small" data-action="edit-setting" data-key="${escapeHtml(item.setting_key)}"><i class="fa-solid fa-pen"></i> تعديل</button></div><pre style="overflow:auto;max-height:10rem;margin:1rem 0 0;padding:.75rem;background:#f8fafc;border-radius:.75rem;font:600 .75rem/1.6 var(--font-english);direction:ltr;text-align:left">${escapeJson(item.value)}</pre></article>`).join('')}</div>` : '<div class="empty-state"><div><i class="fa-solid fa-sliders"></i><h3>لا توجد إعدادات مسجلة</h3><p>لم يضف الموقع الحالي إعدادات قابلة للإدارة بعد.</p></div></div>'}
+      const content = `${pageHeader('إعدادات الموقع', 'حدّث بيانات العمل من حقول واضحة، من دون التعامل مع JSON تقني.')}
+        <section class="panel"><div class="panel-head"><div><h3 class="panel-title">إعدادات العمل</h3><p class="panel-subtitle">كل تعديل يبقى في مصدر البيانات المركزي للموقع.</p></div><span class="badge badge-active"><i class="fa-solid fa-database"></i> مصدر مركزي</span></div>
+          ${settings.length ? `<div class="settings-business-grid">${settings.map((item) => { const presentation = settingPresentation(item); return `<article class="editor-card settings-business-card"><div class="panel-head"><div><h4 style="margin:0">${escapeHtml(presentation.title)}</h4><p class="panel-subtitle">${escapeHtml(presentation.description)}</p></div><button class="btn btn-small" data-action="edit-setting" data-key="${escapeHtml(item.setting_key)}"><i class="fa-solid fa-pen"></i> تعديل</button></div><div class="settings-business-summary">${settingSummary(item.value)}</div></article>`; }).join('')}</div>` : '<div class="empty-state"><div><i class="fa-solid fa-sliders"></i><h3>لا توجد إعدادات مسجلة</h3><p>لم يضف الموقع الحالي إعدادات قابلة للإدارة بعد.</p></div></div>'}
         </section>`;
       app.innerHTML = layout(content);
     } catch (error) { app.innerHTML = layout(`${pageHeader('إعدادات الموقع', '')}${errorMarkup(error.message)}`); }
   }
 
   function openSettingEditor(setting) {
-    openDialog(`تعديل: ${setting.setting_key}`, 'يجب أن تكون القيمة كائن JSON صالحًا.', `<form id="setting-editor" class="form-grid"><div class="field full"><label for="setting-value">القيمة</label><textarea id="setting-value" name="value" class="textarea" dir="ltr" style="min-height:16rem;font-family:var(--font-english)" required>${escapeJson(setting.value)}</textarea><span class="field-hint">لا تعدّل البنية إلا عندما تعرف أثرها على الواجهة المستقبلية.</span></div></form>`, `<button class="btn" type="button" data-close-dialog>إلغاء</button><button class="btn btn-primary" type="button" data-action="save-setting" data-key="${escapeHtml(setting.setting_key)}"><i class="fa-solid fa-floppy-disk"></i> حفظ</button>`);
+    const fields = splitSettingFields(setting);
+    const primary = fields.primary.map(([key, value]) => settingFieldMarkup(key, value)).join('');
+    const advanced = fields.advanced.map(([key, value]) => settingFieldMarkup(key, value)).join('');
+    const presentation = settingPresentation(setting);
+    openDialog(`تعديل: ${presentation.title}`, presentation.description, `<form id="setting-editor" class="form-grid">${primary}${advanced ? advancedSettingsMarkup(advanced, 'إعدادات متقدمة') : ''}</form>`, `<button class="btn" type="button" data-close-dialog>إلغاء</button><button class="btn btn-primary" type="button" data-action="save-setting" data-key="${escapeHtml(setting.setting_key)}"><i class="fa-solid fa-floppy-disk"></i> حفظ التغييرات</button>`);
   }
 
   async function saveSetting(button) {
-    const dialog = button.closest('dialog');
-    const fieldElement = dialog.querySelector('#setting-value');
-    let value;
-    try { value = JSON.parse(fieldElement.value); } catch { showToast('error', 'صيغة JSON غير صحيحة', 'تحقق من الأقواس والفواصل ثم حاول مرة أخرى.'); fieldElement.focus(); return; }
-    if (Array.isArray(value) || value === null || typeof value !== 'object') { showToast('error', 'قيمة غير مدعومة', 'يجب أن تكون القيمة كائن JSON وليس قائمة أو نصًا منفردًا.'); return; }
+    const dialog = button.closest('dialog'); const form = dialog.querySelector('#setting-editor'); const setting = (state.collections.settings || []).find((item) => item.setting_key === button.dataset.key);
+    if (!setting) return;
+    const value = { ...(setting.value || {}) };
+    form.querySelectorAll('[data-setting-field]').forEach((field) => { const key = field.dataset.settingField; const original = setting.value?.[key]; const raw = field.type === 'checkbox' ? field.checked : field.value.trim(); value[key] = Array.isArray(original) ? raw.split(',').map((item) => item.trim()).filter(Boolean) : typeof original === 'number' ? Number(raw) : typeof original === 'boolean' ? Boolean(raw) : raw; });
+    if (Object.values(value).some((item) => typeof item === 'number' && !Number.isFinite(item))) { showToast('error', 'قيمة رقمية غير صحيحة', 'تحقق من الإحداثيات أو الحقول الرقمية ثم حاول مرة أخرى.'); return; }
     setButtonBusy(button, true);
     try { await client.updateSetting(button.dataset.key, { value }); dialog.close(); showToast('success', 'تم حفظ الإعداد', 'تم تحديث الإعداد المركزي.'); await renderSettings(); } catch (error) { showToast('error', 'تعذر حفظ الإعداد', error.message); setButtonBusy(button, false); }
   }
@@ -1119,6 +1258,7 @@
     if (action === 'preview') { const row = (state.collections[target.dataset.kind] || []).find((item) => item.id === target.dataset.id); if (row) openPreview(target.dataset.kind, row); }
     if (action === 'save-item') saveItem(target);
     if (action === 'generate-english') generateEnglish(target);
+    if (action === 'generate-derived') generateDerivedFields(target);
     if (action === 'toggle-featured') updateItemAction(target.dataset.kind, target.dataset.id, 'featured');
     if (action === 'toggle-archive') { const row = (state.collections[target.dataset.kind] || []).find((item) => item.id === target.dataset.id); if (row) updateItemAction(target.dataset.kind, target.dataset.id, row.is_active ? 'archive' : 'restore'); }
     if (action === 'delete-item') deleteItem(target.dataset.kind, target.dataset.id);
@@ -1142,6 +1282,9 @@
     if (action === 'save-blog-category') saveBlogCategory(target);
     if (action === 'toggle-blog-category') toggleBlogCategory(target.dataset.id);
     if (action === 'delete-blog-category') deleteBlogCategory(target.dataset.id);
+    if (action === 'new-review') openReviewEditor(null);
+    if (action === 'edit-review') { const review = (state.reviews || []).find((item) => item.id === target.dataset.id); if (review) openReviewEditor(review); }
+    if (action === 'save-review') saveReview(target);
     if (action === 'approve-review') updateReviewStatus(target.dataset.id, 'approved');
     if (action === 'reject-review') updateReviewStatus(target.dataset.id, 'rejected');
     if (action === 'delete-review') deleteReview(target.dataset.id);

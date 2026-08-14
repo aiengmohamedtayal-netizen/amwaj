@@ -460,6 +460,46 @@ async function translateToEnglish(text) {
   throw lastError || new Error('No translation provider is configured.');
 }
 
+function cleanDerivedHighlights(value) {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set();
+  return value.map((item) => trimText(item, 180)).filter((item) => {
+    const key = item.toLocaleLowerCase();
+    if (!item || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).slice(0, 6);
+}
+
+async function deriveContentFields({ title, description }) {
+  const safeTitle = trimText(title, 420);
+  const safeDescription = trimText(description, 6000);
+  if (!safeTitle && !safeDescription) throw new Error('أدخل عنوانًا أو وصفًا عربيًا قبل توليد الحقول المساعدة.');
+  const messages = [
+    {
+      role: 'system',
+      content: 'You extract safe derived editorial fields from the Arabic title and description supplied by an authenticated administrator. Never invent prices, availability, activities, accommodation, itinerary, services, factual claims, or business facts. The Arabic alt text must be concise and neutral. If no image-specific detail is supplied, use only the title without adding visual claims. Highlights must be short Arabic restatements or direct extractions of explicitly stated benefits only. If none are explicit, return an empty highlights list. Return JSON only: {"image_alt_ar":"...","highlights":["..."]}.'
+    },
+    { role: 'user', content: JSON.stringify({ title_ar: safeTitle, description_ar: safeDescription }) }
+  ];
+  let lastError = null;
+  for (const provider of providers()) {
+    try {
+      const response = await requestModel(provider, messages);
+      if (!response.ok) {
+        lastError = new Error(`Derived content model request failed (${response.status})`);
+        continue;
+      }
+      const output = parseModelOutput(await response.json());
+      const imageAltAr = trimText(output?.image_alt_ar, 240);
+      const highlights = cleanDerivedHighlights(output?.highlights);
+      if (imageAltAr || highlights.length) return { image_alt_ar: imageAltAr || safeTitle, highlights };
+      lastError = new Error('Derived content response was empty.');
+    } catch (error) { lastError = error; }
+  }
+  throw lastError || new Error('No derived content provider is configured.');
+}
+
 function verifiedSourcesFromSnapshot(value, snapshot) {
   if (!Array.isArray(value)) return [];
   return value.slice(0, 6).map((item) => {
@@ -616,7 +656,7 @@ export default async function handler(req, res) {
     const auth = await requireAdmin(req);
     if (rateLimited(`admin:${auth.userId}`)) return res.status(429).json({ error: 'Rate limit exceeded', message: 'تم تجاوز حد طلبات المساعد مؤقتاً.' });
     const body = safeJson(req.body);
-    const mode = body.mode === 'execute' || body.mode === 'translate' ? body.mode : 'chat';
+    const mode = body.mode === 'execute' || body.mode === 'translate' || body.mode === 'derive' ? body.mode : 'chat';
     const attachments = cleanAttachments(body.attachments);
     const trustedImageUrls = attachments.map((item) => item.url);
     const document = cleanDocument(body.document);
@@ -630,6 +670,14 @@ export default async function handler(req, res) {
       const translation = await translateToEnglish(text);
       audit('admin_translation', { userId: auth.userId, characters: text.length, targetLang: 'en' });
       return res.status(200).json({ ok: true, translation });
+    }
+
+    if (mode === 'derive') {
+      const title = trimText(body.title, 420);
+      const description = trimText(body.description, 6000);
+      const derived = await deriveContentFields({ title, description });
+      audit('admin_derived_content', { userId: auth.userId, titleCharacters: title.length, descriptionCharacters: description.length, highlights: derived.highlights.length });
+      return res.status(200).json({ ok: true, derived });
     }
 
     if (mode === 'execute') {
