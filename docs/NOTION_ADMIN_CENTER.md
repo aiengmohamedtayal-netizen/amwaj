@@ -1,125 +1,132 @@
-# Amwaj Notion Admin Center
+# مركز إدارة أمواج عبر Notion
 
-## الهدف
+## ما الذي تم بناؤه؟
 
-يجعل هذا التكامل قاعدة **Amwaj Admin** في Notion واجهة تشغيل للمحتوى. تبقى Supabase هي مصدر الحقيقة للتشغيل العام، بينما تطلب Notion عمليات محددة ومتحققاً منها عبر وظيفة Vercel. لا يحمل المتصفح ولا Notion أي مفتاح Supabase بصلاحية `service_role`.
+قاعدة **إدارة أمواج** في Notion أصبحت واجهة تشغيل عربية لإدارة محتوى الموقع. أنت تُدخل أو تعدّل بيانات البرنامج أو الخدمة أو المقال داخل Notion، ثم تطلب الإجراء المناسب. تصل العملية إلى وظيفة آمنة في Vercel، فتتحقق منها وتُحدّث Supabase، ثم تكتب النتيجة مرة أخرى في نفس السجل داخل Notion.
 
 ```text
-Notion page action
-    -> Notion webhook
-    -> /api/notion-admin
-    -> validate signature, action, and record
-    -> Supabase Auth / REST with service role
-    -> write outcome back to the Notion page
+سجل في Notion
+    ↓
+Webhook موقّع من Notion
+    ↓
+/api/notion-admin في Vercel
+    ↓
+التحقق من البيانات والصلاحيات ومنع التكرار
+    ↓
+Supabase Auth أو قاعدة بيانات Supabase
+    ↓
+تحديث النتيجة في Notion
 ```
 
-Notion يرسل بيانات وصفية للحدث فقط؛ لذلك تسترجع الوظيفة صفحة Notion كاملة بالـID الوارد في الحدث قبل اتخاذ أي إجراء. التوقيع هو HMAC-SHA256 لجسم طلب webhook باستخدام `verification_token` الذي يرسله Notion عند الاشتراك.[1]
+> **Supabase هي مصدر البيانات الفعلي للموقع.** Notion هي شاشة تشغيل وإدارة، وليست مكان حفظ مفاتيح السر أو كلمات المرور.
 
-## الحدود الأمنية
+## طريقة الاستخدام اليومية
 
-| القرار | التطبيق |
-|---|---|
-| مفاتيح الخادم | تحفظ `NOTION_API_TOKEN` و`NOTION_WEBHOOK_VERIFICATION_TOKEN` و`SUPABASE_SERVICE_ROLE_KEY` في متغيرات Vercel فقط. |
-| مصادقة webhook | لا تنفذ أي عملية قبل مطابقة `X-Notion-Signature` مع HMAC-SHA256 للجسم الخام. |
-| عزل قاعدة Notion | يجب أن يطابق `parent.data_source_id` القيمة `NOTION_ADMIN_DATA_SOURCE_ID`. |
-| قائمة بيضاء | تقبل الوظيفة كيانات وإجراءات وخصائص Notion معرفة مسبقاً فقط. |
-| منع التكرار | يسجّل الخادم معرف حدث Notion في `notion_admin_operation_logs` بمفتاح فريد قبل تنفيذ أي تعديل؛ ويُعرض `Action Request ID` في Notion للتتبع. |
-| العمليات المدمرة | لا تقبل `Delete` ما لم تكن قيمة `Confirm Delete` صحيحة؛ ثم تُؤرشف صفحة Notion بعد نجاح الحذف. |
-| حسابات المديرين | ترسل دعوة بريدية فقط ولا تنشئ أو تخزن كلمة مرور. إجراءات التعطيل وإعادة التنشيط منفصلة. |
-| التتبع | تكتب النتيجة والوقت والـID الخارجي ورسالة الفشل إلى صفحة Notion، مع سجل JSON آمن في Vercel. |
+أنشئ صفًا جديدًا من زر **جديد** داخل قاعدة إدارة أمواج. اكتب الاسم واختر نوع المحتوى، ثم املأ الحقول اللازمة. لا يحدث أي تغيير في الموقع بمجرد الكتابة؛ التنفيذ يبدأ فقط بعد اختيار **إجراء مطلوب** وتغيير **حالة طلب التنفيذ** إلى **جاهز للتنفيذ**.
 
-## دورة تشغيل السجل
-
-| `Action` | الشرط | نتيجة Supabase | نتيجة Notion |
-|---|---|---|---|
-| `Create` | لا يوجد `External ID` | إضافة صف جديد | `External ID` جديد و`Process Status = Completed` |
-| `Update` | يوجد `External ID` | تحديث الحقول المسموحة فقط | `Completed` |
-| `Publish` | سجل محتوى موجود | `status = published` | `Status = Published` و`Completed` |
-| `Archive` | سجل محتوى موجود | حالة أرشفة أو `is_active = false` حسب الكيان | `Status = Archived` و`Completed` |
-| `Delete` | `Confirm Delete = true` | حذف الصف المستهدف | أرشفة صفحة Notion و`Completed` |
-| `Invite Admin` | بريد صالح ولا يوجد `Auth User ID` | دعوة Supabase Auth ثم `profiles.is_admin = true` | `Auth User ID` و`Completed` |
-| `Disable Admin` | `Auth User ID` موجود | حظر الحساب لفترة طويلة و`is_admin = false` | `Process Status = Completed` |
-| `Reactivate Admin` | `Auth User ID` موجود | إزالة الحظر و`is_admin = true` | `Process Status = Completed` |
-| `Sync` | إداري فقط | لا يغير Supabase | تحديث نسخة السجل في Notion من Supabase |
-
-## مطابقة الكيانات
-
-| Notion `Entity` | جدول Supabase | المعرّف الخارجي | ملاحظات |
-|---|---|---|---|
-| `Package` | `packages` | `id` | يتطلب التصنيف والعناوين والوصفين والصورة وتسميات السعر عند الإنشاء. |
-| `Destination` | `destinations` | `id` | يتطلب التصنيف والعناوين والوصفين والصورة وتسميات السعر عند الإنشاء. |
-| `Service` | `services` | `id` | يتطلب `Icon Class` والعناوين والوصفين عند الإنشاء. |
-| `Pricing Offer` | `pricing_offers` | `id` | يرتبط ببرنامج **أو** خدمة واحدة وبوجهة؛ السعر بالجنيه المصري. |
-| `Blog Category` | `blog_categories` | `id` | يتطلب عنوانين وSlug. |
-| `Blog Post` | `blog_posts` | `id` | يعتمد على `Category ID` ويحوّل جسم صفحة Notion إلى محتوى Markdown. |
-| `Review` | `customer_reviews` | `id` | لا يُنشأ من Notion؛ يسمح بالاعتماد والرفض والإبراز والأرشفة والحذف فقط. |
-| `Setting` | `site_settings` | `setting_key` | يقبل JSON object في `Setting Value JSON`. |
-| `Admin User` | `auth.users` + `profiles` | `Auth User ID` | يستخدم الدعوات ولا ينقل كلمات مرور إلى Notion. |
-
-## خصائص قاعدة Notion
-
-الخصائص المعيارية الحالية (`Name` و`Entity` و`External ID` و`Title AR` و`Title EN` و`Status` وغيرها) تبقى موجودة. تضيف عملية الإعداد خصائص التشغيل التالية:
-
-| الخاصية | النوع | الاستخدام |
+| ما تريد عمله | اختَر من «إجراء مطلوب» | ما يجب التأكد منه |
 |---|---|---|
-| `Action` | Select | الإجراء المطلوب. القيمة الافتراضية `No Action`. |
-| `Process Status` | Select | `Ready` أو`Processing` أو`Completed` أو`Failed` أو`Needs Review` أو`Ignored`. |
-| `Action Request ID` | Text | مفتاح تنفيذ وحيد لكل محاولة. |
-| `Result Message` | Text | ملخص آمن للنتيجة أو سبب الفشل. |
-| `Processed At` | Date | وقت آخر عملية مكتملة. |
-| `Confirm Delete` | Checkbox | تأكيد صريح للحذف النهائي. |
-| `Slug` | Text | Slug المحتوى؛ يولد تلقائياً إن لم يُقدّم عند الإنشاء. |
-| `Highlights JSON` | Text | مصفوفة JSON للنقاط المميزة. |
-| `Email` | Email | بريد دعوة المدير فقط. |
-| `Auth User ID` | Text | معرف Supabase Auth بعد الدعوة. |
-| `Icon Class` | Text | رمز الخدمة. |
-| `Category ID` | Text | معرف تصنيف مقال المدونة. |
-| `Package ID` و`Service ID` و`Destination ID` | Text | علاقات عرض السعر. |
-| `Price Mode` و`Price Amount` و`Discounted Price Amount` | Select/Number | تسعير البرامج والعروض. |
-| `Departure Month` و`Trip Style` و`Availability` | Date/Select/Select | خصائص عرض السعر. |
-| `Setting Key` و`Setting Value JSON` | Text | إعدادات الموقع. |
+| إضافة محتوى جديد | إنشاء | اترك «المعرّف الخارجي» فارغًا واملأ الحقول الإلزامية |
+| تعديل محتوى موجود | تعديل | ضع «المعرّف الخارجي» الموجود للسجل |
+| إظهار المحتوى على الموقع | نشر | يجب وجود المعرّف الخارجي |
+| إخفاء المحتوى مع الاحتفاظ به | أرشفة | يجب وجود المعرّف الخارجي |
+| حذف نهائي | حذف | فعّل مربع «تأكيد الحذف» أولًا |
+| دعوة مدير جديد | دعوة مدير | اكتب البريد الإلكتروني واترك «معرّف مستخدم الدخول» فارغًا |
+| تعطيل مدير | تعطيل مدير | اكتب «معرّف مستخدم الدخول» |
+| إعادة تفعيل مدير | إعادة تفعيل مدير | اكتب «معرّف مستخدم الدخول» |
+| جلب آخر نسخة من البيانات | مزامنة | يجب وجود المعرّف الخارجي |
 
-## محتوى مقالات المدونة
+بعد التشغيل تابع **حالة طلب التنفيذ** و**رسالة النتيجة**. سيكتب النظام «اكتمل» عند النجاح أو «فشل» مع سبب آمن وواضح عند وجود مشكلة.
 
-لتجنب سقف النص في خصائص Notion، يؤخذ النص الطويل من جسم صفحة المقال. يجب أن يحتوي جسم الصفحة على العنوانين التاليين تماماً:
+## شرح Views الموجودة
+
+| الـView | وظيفته |
+|---|---|
+| **العرض الافتراضي** | يعرض كل السجلات لإضافة المحتوى وتعديله |
+| **طابور العمليات** | يعرض السجلات الجاهزة للتنفيذ فقط |
+| **العمليات الفاشلة** | يعرض العمليات التي تحتاج تصحيح بياناتها ثم إعادة المحاولة |
+| **المحتوى حسب الحالة** | لوحة منظمة حسب حالة ظهور المحتوى مثل مسودة أو منشور أو مؤرشف |
+
+## أنواع المحتوى المدعومة
+
+| «نوع المحتوى» | ما يديره في الموقع | أهم الحقول |
+|---|---|---|
+| برنامج | جدول `packages` | التصنيف، العناوين، الوصف، الصورة، السعر، ترتيب العرض |
+| وجهة | جدول `destinations` | التصنيف، العناوين، الوصف، الصورة، السعر، ترتيب العرض |
+| خدمة | جدول `services` | العناوين، الوصف، رمز الخدمة، ترتيب العرض |
+| عرض سعر | جدول `pricing_offers` | معرّف البرنامج أو الخدمة أو الوجهة، التاريخ، التسعير، التوفر |
+| تصنيف مدونة | جدول `blog_categories` | العنوانان والرابط المختصر |
+| مقال مدونة | جدول `blog_posts` | معرّف التصنيف، العنوانان، الملخصان، الصورة، بيانات SEO |
+| رأي عميل | جدول `customer_reviews` | الاعتماد أو الرفض أو الإبراز أو الأرشفة؛ الإنشاء يأتي من نموذج الموقع العام |
+| إعداد موقع | جدول `site_settings` | مفتاح الإعداد وقيمته بصيغة JSON |
+| مدير النظام | `auth.users` و`profiles` | الاسم والبريد الإلكتروني ومعرّف مستخدم الدخول |
+
+## الحقول التي ستستخدمها غالبًا
+
+| الحقل | الغرض |
+|---|---|
+| **الاسم** | اسم واضح للسجل؛ يُستخدم للتعرّف عليه داخل Notion |
+| **نوع المحتوى** | يحدد الجهة التي ستُدار في Supabase |
+| **إجراء مطلوب** | يحدد ما تريد من النظام تنفيذه |
+| **حالة طلب التنفيذ** | اجعلها «جاهز للتنفيذ» بعد مراجعة البيانات |
+| **حالة ظهور المحتوى** | مسودة أو منشور أو مؤرشف أو حالة المحتوى المناسبة |
+| **المعرّف الخارجي** | رقم السجل في Supabase؛ يكتبه النظام بعد الإنشاء |
+| **رسالة النتيجة** | خلاصة نجاح العملية أو سبب فشلها |
+| **تم التنفيذ في** | وقت آخر عملية مكتملة |
+| **ترتيب العرض** | ترتيب ظهور العنصر في الموقع؛ استخدم أرقامًا صحيحة |
+| **نشط / مميز** | مفاتيح تشغيل العنصر وإبرازه حيث يدعمه نوع المحتوى |
+
+## المقالات الطويلة
+
+اكتب المحتوى الطويل داخل جسم صفحة المقال، لا في الخانات القصيرة. استخدم العناوين التالية كما هي:
 
 ```markdown
 ## المحتوى العربي
 
-اكتب محتوى المقال العربي هنا.
+اكتب المقال بالعربية هنا.
 
 ## English Content
 
-Write the English article content here.
+Write the English article here.
 ```
 
-تحوّل الوظيفة الفقرات والعناوين والقوائم والاقتباسات والأسطر البرمجية إلى Markdown خام قبل حفظها في `content_ar` و`content_en`. لا يفسر الموقع هذا المحتوى كـHTML موثوق.
+تُحفظ الفقرتان في حقلي المحتوى العربي والإنجليزي في Supabase عند تنفيذ الإنشاء أو التعديل.
 
-## متغيرات Vercel المطلوبة
+## حماية العمليات
 
-| المتغير | مطلوب | الغرض |
-|---|---:|---|
-| `SUPABASE_URL` | نعم | رابط مشروع Amwaj في Supabase. |
-| `SUPABASE_SERVICE_ROLE_KEY` | نعم | عمليات الخادم فقط على Supabase. |
-| `NOTION_API_TOKEN` | نعم | اتصال Notion الذي يملك حق الوصول إلى قاعدة Amwaj Admin. |
-| `NOTION_ADMIN_DATA_SOURCE_ID` | نعم | معرف data source لقاعدة Amwaj Admin. |
-| `NOTION_WEBHOOK_VERIFICATION_TOKEN` | نعم بعد التحقق | توقيع أحداث Notion. |
-| `NOTION_API_VERSION` | لا | الافتراضي `2025-09-03`. |
+| الضابط | كيف يحميك |
+|---|---|
+| توقيع Webhook | لا تُقبل العملية إلا إذا كانت موقعة من Notion باستخدام HMAC-SHA256 |
+| قائمة إجراءات محددة | لا يستطيع السجل تنفيذ أمر غير مدعوم |
+| منع التكرار | يسجل النظام معرف حدث Notion؛ فلا تُنفذ العملية نفسها مرتين |
+| تأكيد الحذف | الحذف النهائي لا يتم قبل تفعيل «تأكيد الحذف» |
+| مفاتيح الخادم | مفاتيح Supabase الحساسة وNotion موجودة في متغيرات Vercel فقط |
+| المديرون | يُرسَل رابط دعوة بالبريد؛ لا تُحفظ كلمة مرور داخل Notion |
+| سجل تدقيق | تحفظ نتيجة كل عملية ووقتها ومعرفها داخل Notion وSupabase |
 
-## إعداد الاتصال مرة واحدة
+## التفعيل التقني لمرة واحدة
 
-ينشئ المسؤول Notion connection بقدرات قراءة وتحديث المحتوى، ويشارك معها قاعدة **Amwaj Admin**. ثم يطبق ملف migration `supabase/migrations/202608140001_notion_admin_operation_logs.sql` قبل تفعيل webhooks؛ وهو محفوظ ومطبق بالفعل على مشروع Amwaj الحالي. بعد نشر Vercel، ينشئ اشتراك Webhook إلى:
+يلزم حفظ المتغيرات التالية في إعدادات مشروع Vercel، من دون وضع أي قيمة سرية في GitHub أو Notion.
+
+| المتغير | الغرض |
+|---|---|
+| `SUPABASE_URL` | رابط مشروع Supabase |
+| `SUPABASE_SERVICE_ROLE_KEY` | مفتاح عمليات الخادم فقط |
+| `NOTION_API_TOKEN` | مفتاح اتصال Notion المشترك مع قاعدة إدارة أمواج |
+| `NOTION_ADMIN_DATA_SOURCE_ID` | `0bc03f1a-fb3a-4994-8e01-162efb067bc5` |
+| `NOTION_WEBHOOK_VERIFICATION_TOKEN` | قيمة تحقق Webhook بعد إعداد الاشتراك |
+
+بعد النشر، يُنشأ Webhook في Notion على هذا العنوان:
 
 ```text
 https://amwaj-virid.vercel.app/api/notion-admin
 ```
 
-ويختار أحداث الصفحة `page.created` و`page.properties_updated` و`page.content_updated`. يسجل الخادم رمز التحقق الأولي في سجلات Vercel فقط؛ ينقل المسؤول الرمز إلى متغير `NOTION_WEBHOOK_VERIFICATION_TOKEN` ثم يضغط Verify داخل إعدادات Notion. لا يبدأ تنفيذ الإجراءات قبل ضبط هذا المتغير.
+اختر أحداث إنشاء الصفحة وتعديل الخصائص وتعديل المحتوى. يرسل Notion رمز تحقق أولي؛ انسخه من سجل Vercel إلى متغير `NOTION_WEBHOOK_VERIFICATION_TOKEN` ثم أكد الاشتراك.
 
-## المراجع
+## مراجع
 
-[1]: https://developers.notion.com/reference/webhooks "Notion Webhooks"
-[2]: https://supabase.com/docs/reference/javascript/auth-admin-inviteuserbyemail "Supabase: inviteUserByEmail"
-[3]: https://supabase.com/docs/reference/javascript/auth-admin-updateuserbyid "Supabase: updateUserById"
+[1]: https://developers.notion.com/reference/webhooks "توثيق Notion Webhooks"
+[2]: https://supabase.com/docs/reference/javascript/auth-admin-inviteuserbyemail "Supabase: دعوة مستخدم عبر البريد"
 
-[1] [2] [3]
+[1] [2]

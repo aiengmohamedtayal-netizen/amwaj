@@ -21,6 +21,62 @@ const PROCESSABLE_EVENT_TYPES = new Set(['page.created', 'page.properties_update
 const ACTIONS = new Set(['Create', 'Update', 'Publish', 'Archive', 'Delete', 'Invite Admin', 'Disable Admin', 'Reactivate Admin', 'Sync']);
 const ENTITY_NAMES = new Set(['Package', 'Destination', 'Service', 'Pricing Offer', 'Blog Category', 'Blog Post', 'Review', 'Setting', 'Admin User']);
 
+// The code uses stable internal keys while the Notion workspace is fully Arabic.
+const NOTION_PROPERTY_AR = {
+  Name: 'الاسم', Entity: 'نوع المحتوى', Action: 'إجراء مطلوب', 'Process Status': 'حالة طلب التنفيذ',
+  'Action Request ID': 'رقم طلب العملية', 'Result Message': 'رسالة النتيجة', 'Processed At': 'تم التنفيذ في',
+  'External ID': 'المعرّف الخارجي', Status: 'حالة ظهور المحتوى', Active: 'نشط', Featured: 'مميز',
+  Category: 'التصنيف', 'Sort Order': 'ترتيب العرض', 'Title AR': 'العنوان العربي', 'Title EN': 'العنوان الإنجليزي',
+  'Description AR': 'الوصف العربي', 'Description EN': 'الوصف الإنجليزي', 'Image URL': 'رابط الصورة',
+  'Image Alt AR': 'وصف الصورة بالعربية', 'Image Alt EN': 'وصف الصورة بالإنجليزية',
+  'Badge AR': 'شارة بالعربية', 'Badge EN': 'شارة بالإنجليزية', Rating: 'التقييم',
+  'Highlights JSON': 'مزايا العرض JSON', 'Price AR': 'السعر بالعربية', 'Price EN': 'السعر بالإنجليزية',
+  'Icon Class': 'رمز الخدمة', 'Package ID': 'معرّف البرنامج', 'Service ID': 'معرّف الخدمة',
+  'Destination ID': 'معرّف الوجهة', 'Trip Style': 'نمط الرحلة', 'Departure Month': 'شهر المغادرة',
+  'Min Travelers': 'أقل عدد مسافرين', 'Max Travelers': 'أكبر عدد مسافرين', 'Price Mode': 'أسلوب التسعير',
+  'Price Amount': 'السعر الأساسي', 'Discounted Price Amount': 'السعر بعد الخصم', Availability: 'حالة التوفر',
+  'Seats Available': 'المقاعد المتاحة', 'Notes AR': 'ملاحظات بالعربية', 'Notes EN': 'ملاحظات بالإنجليزية',
+  'Category ID': 'معرّف تصنيف المدونة', 'Excerpt AR': 'ملخص بالعربية', 'Excerpt EN': 'ملخص بالإنجليزية',
+  'SEO Title AR': 'عنوان SEO بالعربية', 'SEO Title EN': 'عنوان SEO بالإنجليزية',
+  'SEO Description AR': 'وصف SEO بالعربية', 'SEO Description EN': 'وصف SEO بالإنجليزية',
+  'OG Image URL': 'رابط صورة المشاركة', 'Published At': 'تاريخ النشر', 'Customer Name': 'اسم العميل',
+  'Review Text': 'نص المراجعة', 'Setting Key': 'مفتاح الإعداد', 'Setting Value JSON': 'قيمة الإعداد JSON',
+  Email: 'البريد الإلكتروني', 'Auth User ID': 'معرّف مستخدم الدخول', 'Confirm Delete': 'تأكيد الحذف',
+  Slug: 'الرابط المختصر', 'Last Synced At': 'آخر مزامنة', Notes: 'ملاحظات عامة',
+};
+
+const SELECT_VALUE_AR = {
+  'No Action': 'بدون إجراء', Create: 'إنشاء', Update: 'تعديل', Publish: 'نشر', Archive: 'أرشفة', Delete: 'حذف',
+  'Invite Admin': 'دعوة مدير', 'Disable Admin': 'تعطيل مدير', 'Reactivate Admin': 'إعادة تفعيل مدير', Sync: 'مزامنة',
+  Package: 'برنامج', Destination: 'وجهة', Service: 'خدمة', 'Pricing Offer': 'عرض سعر', 'Blog Category': 'تصنيف مدونة',
+  'Blog Post': 'مقال مدونة', Review: 'رأي عميل', Setting: 'إعداد موقع', 'Admin User': 'مدير النظام',
+  Ready: 'جاهز للتنفيذ', Processing: 'جارٍ التنفيذ', Completed: 'اكتمل', Failed: 'فشل', 'Needs Review': 'يحتاج مراجعة',
+  Ignored: 'تم التجاهل', Draft: 'مسودة', Published: 'منشور', Archived: 'مؤرشف', Pending: 'قيد المراجعة',
+  Approved: 'معتمد', Rejected: 'مرفوض', Active: 'نشط', Available: 'متاح', Limited: 'محدود', 'Sold Out': 'نفدت المقاعد',
+  Quote: 'حسب الطلب', Fixed: 'سعر ثابت', 'Starting From': 'يبدأ من', Discount: 'خصم', Family: 'عائلي',
+  Honeymoon: 'شهر عسل', Umrah: 'عمرة', Budget: 'اقتصادي', VIP: 'كبار الشخصيات', Custom: 'مخصص',
+};
+
+function selectLookupKey(value) {
+  return trimText(String(value || ''), 120).toLocaleLowerCase('ar').replace(/\s+/g, ' ');
+}
+
+const SELECT_VALUE_CANONICAL = new Map(
+  Object.entries(SELECT_VALUE_AR).flatMap(([canonical, arabic]) => [
+    [selectLookupKey(canonical), canonical],
+    [selectLookupKey(arabic), canonical],
+  ]),
+);
+
+function canonicalSelectValue(value) {
+  const raw = trimText(String(value || ''), 120);
+  return SELECT_VALUE_CANONICAL.get(selectLookupKey(raw)) || raw;
+}
+
+function localizedNotionProperties(properties) {
+  return Object.fromEntries(Object.entries(properties).map(([key, value]) => [NOTION_PROPERTY_AR[key] || key, value]));
+}
+
 function env(name, fallback = '') {
   return String(process.env[name] || fallback).trim();
 }
@@ -141,7 +197,8 @@ async function supabaseRequest(config, path, options = {}) {
 }
 
 function property(page, name) {
-  return page?.properties?.[name] || null;
+  // Accept legacy English properties during the transition, but prefer the Arabic workspace label.
+  return page?.properties?.[NOTION_PROPERTY_AR[name]] || page?.properties?.[name] || null;
 }
 
 function richTextValue(item) {
@@ -172,11 +229,11 @@ function checkboxProperty(page, name) {
 }
 
 function selectProperty(page, name) {
-  return stringProperty(page, name);
+  return canonicalSelectValue(stringProperty(page, name));
 }
 
 function lowerStatus(value) {
-  return trimText(value, 80).toLowerCase().replace(/\s+/g, '_');
+  return canonicalSelectValue(value).toLowerCase().replace(/\s+/g, '_');
 }
 
 function statusForNotion(value) {
@@ -673,7 +730,8 @@ function titleProperty(value) {
 }
 
 function selectUpdate(value) {
-  return { select: value ? { name: value } : null };
+  const canonical = canonicalSelectValue(value);
+  return { select: canonical ? { name: SELECT_VALUE_AR[canonical] || canonical } : null };
 }
 
 function checkboxUpdate(value) {
@@ -799,7 +857,7 @@ function operationProperties({ processStatus, action = undefined, requestId = un
 async function updateNotionPage(config, pageId, properties) {
   return notionRequest(config, `/pages/${encodeURIComponent(pageId)}`, {
     method: 'PATCH',
-    body: JSON.stringify({ properties }),
+    body: JSON.stringify({ properties: localizedNotionProperties(properties) }),
   });
 }
 
@@ -843,8 +901,45 @@ function eventPageId(event) {
   return String(event?.entity?.id || event?.data?.page_id || event?.page_id || '').trim();
 }
 
+function arabicActionName(action) {
+  return SELECT_VALUE_AR[action] || action;
+}
+
+function arabicResultMessage(message) {
+  const text = trimText(message, 850).replace(/[\r\n]+/g, ' ');
+  const exact = {
+    'Unsupported entity.': 'نوع المحتوى غير مدعوم.',
+    'Unsupported action for Admin User.': 'هذا الإجراء غير مدعوم لمدير النظام.',
+    'Unexpected action failure.': 'تعذّر تنفيذ العملية لسبب غير متوقع.',
+    'Internal Server Error': 'حدث خطأ داخلي في الخادم.',
+    'The linked Supabase record was not found.': 'لم يتم العثور على السجل المرتبط في قاعدة البيانات.',
+    'Supabase did not return the saved record.': 'تمت محاولة الحفظ لكن لم تُعِد قاعدة البيانات السجل المحفوظ.',
+    'Reviews are created through the public review form, not Notion.': 'تُنشأ آراء العملاء من نموذج الموقع العام، وليس من Notion.',
+    'Delete requires Confirm Delete to be checked.': 'يجب تفعيل مربع «تأكيد الحذف» قبل الحذف النهائي.',
+    'Create requires an empty External ID.': 'عند الإنشاء يجب أن يظل «المعرّف الخارجي» فارغًا.',
+    'Invite Admin requires an empty Auth User ID.': 'عند دعوة مدير جديد يجب أن يظل «معرّف مستخدم الدخول» فارغًا.',
+    'Name is required for an admin invitation.': 'الاسم مطلوب لإرسال دعوة المدير.',
+    'Name is required.': 'الاسم مطلوب.',
+    'Email is invalid.': 'البريد الإلكتروني غير صحيح.',
+    'Slug may contain lowercase letters, numbers, and hyphens only.': 'الرابط المختصر يقبل حروفًا إنجليزية صغيرة وأرقامًا وشرطات فقط.',
+    'Sort Order cannot be negative.': 'ترتيب العرض لا يمكن أن يكون رقمًا سالبًا.',
+    'Rating must be between 0 and 5.': 'التقييم يجب أن يكون بين 0 و5.',
+    'Traveler counts are invalid.': 'أعداد المسافرين غير صحيحة.',
+    'Trip Style is invalid.': 'نمط الرحلة غير صحيح.',
+    'Price Mode is invalid.': 'أسلوب التسعير غير صحيح.',
+    'Availability is invalid.': 'حالة التوفر غير صحيحة.',
+  };
+  if (exact[text]) return exact[text];
+  if (/ requires External ID\.$/.test(text)) return `الإجراء «${arabicActionName(text.replace(/ requires External ID\.$/, ''))}» يحتاج «المعرّف الخارجي».`;
+  if (/ requires Auth User ID\.$/.test(text)) return `الإجراء «${arabicActionName(text.replace(/ requires Auth User ID\.$/, ''))}» يحتاج «معرّف مستخدم الدخول».`;
+  if (/ must be a valid UUID\.$/.test(text)) return `الحقل «${text.replace(/ must be a valid UUID\.$/, '')}» يجب أن يحتوي على معرّف صحيح.`;
+  if (/ must be a valid HTTPS URL\.$/.test(text)) return `الحقل «${text.replace(/ must be a valid HTTPS URL\.$/, '')}» يجب أن يحتوي على رابط HTTPS صحيح.`;
+  if (/ completed successfully\.$/.test(text)) return `تم تنفيذ إجراء «${arabicActionName(text.replace(/ completed successfully\.$/, ''))}» بنجاح.`;
+  return text || 'تعذّر تنفيذ العملية. راجع البيانات ثم حاول مرة أخرى.';
+}
+
 function safeResultMessage(message) {
-  return trimText(message, 850).replace(/[\r\n]+/g, ' ');
+  return arabicResultMessage(message);
 }
 
 async function processPageEvent(config, event, webhookEventId) {
@@ -875,7 +970,7 @@ async function processPageEvent(config, event, webhookEventId) {
         processStatus: 'Completed',
         action: 'No Action',
         requestId,
-        resultMessage: `${action} completed successfully.`,
+        resultMessage: `تم تنفيذ إجراء «${arabicActionName(action)}» بنجاح.`,
         externalId: entity === 'Admin User' ? undefined : result.externalId,
         authUserId: entity === 'Admin User' ? result.externalId : undefined,
         status: result.record?.status ? statusForNotion(result.record.status) : (action === 'Archive' ? 'Archived' : undefined),
@@ -886,7 +981,7 @@ async function processPageEvent(config, event, webhookEventId) {
     await updateOperation(config, claim.operation?.id, {
       status: 'completed',
       external_id: result.externalId || null,
-      result_message: `${action} completed successfully.`,
+      result_message: `تم تنفيذ إجراء «${arabicActionName(action)}» بنجاح.`,
       completed_at: new Date().toISOString(),
       metadata: { source: 'notion_webhook', request_id: requestId, entity, action },
     });
