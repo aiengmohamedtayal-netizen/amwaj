@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="theme-color" content="#0099D8">
+  <title>تعيين كلمة المرور | أمواج للسياحة</title>
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/admin/css/admin.css">
+</head>
+<body class="login-page">
+  <section class="login-hero" aria-label="أمواج للسياحة">
+    <img class="login-logo" src="/assets/logo.png" alt="شعار أمواج للسياحة">
+    <div><h1>أمّن حسابك بكلمة مرور جديدة.</h1><p>استخدم هذه الصفحة فقط بعد فتح رابط الدعوة أو الاسترداد المرسل إلى بريدك الإلكتروني.</p></div>
+  </section>
+  <main class="login-form-panel">
+    <section class="login-form" aria-labelledby="reset-title">
+      <a href="/admin/login/" class="muted" style="text-decoration:none"><i class="fa-solid fa-arrow-right"></i> العودة إلى تسجيل الدخول</a>
+      <h2 id="reset-title" style="margin-top:1.25rem">تعيين كلمة المرور</h2>
+      <p>اختر كلمة مرور جديدة لا تقل عن 12 حرفًا. لا يتم حفظها أو عرضها في Notion.</p>
+      <form id="reset-password-form" novalidate>
+        <div class="field"><label for="new-password">كلمة المرور الجديدة</label><input class="input" id="new-password" name="new-password" type="password" autocomplete="new-password" minlength="12" required placeholder="12 حرفًا على الأقل"></div>
+        <div class="field"><label for="confirm-password">تأكيد كلمة المرور</label><input class="input" id="confirm-password" name="confirm-password" type="password" autocomplete="new-password" minlength="12" required placeholder="أعد كتابة كلمة المرور"></div>
+        <button id="reset-password-submit" class="btn btn-primary" type="submit"><i class="fa-solid fa-key"></i> حفظ كلمة المرور</button>
+      </form>
+      <div class="login-notice"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i><span>صلاحية رابط البريد مؤقتة. إذا انتهت، اطلب إرسال رابط جديد من قسم حسابات المديرين.</span></div>
+      <p id="reset-password-feedback" role="alert" aria-live="assertive" style="min-height:1.25rem;margin-top:1rem;color:#b42318;font-size:.82rem"></p>
+    </section>
+  </main>
+  <script src="/admin/js/config.js"></script>
+  <script src="/admin/js/supabase-client.js"></script>
+  <script src="/admin/js/reset-password.js"></script>
+</body>
+</html>

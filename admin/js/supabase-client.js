@@ -87,6 +87,34 @@
     return saveSession(session);
   }
 
+  function captureEmailLinkSession() {
+    const fragment = new URLSearchParams(String(window.location.hash || '').replace(/^#/, ''));
+    const accessToken = String(fragment.get('access_token') || '').trim();
+    const refreshToken = String(fragment.get('refresh_token') || '').trim();
+    if (!accessToken || !refreshToken) return null;
+    const expiresIn = Number(fragment.get('expires_in') || 0);
+    const session = saveSession({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+      expires_at: Number.isFinite(expiresIn) && expiresIn > 0 ? Math.floor(Date.now() / 1000) + expiresIn : null,
+      token_type: String(fragment.get('token_type') || 'bearer'),
+    });
+    window.history.replaceState({}, document.title, `${window.location.pathname}${window.location.search}`);
+    return session;
+  }
+
+  async function updatePassword(password) {
+    const cleanPassword = String(password || '');
+    if (cleanPassword.length < 12) throw new Error('استخدم كلمة مرور لا تقل عن 12 حرفًا.');
+    const session = await getValidSession();
+    if (!session?.access_token) throw new Error('رابط تعيين كلمة المرور غير صالح أو انتهت صلاحيته.');
+    return authRequest('/user', {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({ password: cleanPassword })
+    });
+  }
+
   async function signOut() {
     const session = await getValidSession();
     try {
@@ -215,6 +243,8 @@
     getSession,
     getValidSession,
     signInWithPassword,
+    captureEmailLinkSession,
+    updatePassword,
     signOut,
     requireAdmin,
     list,

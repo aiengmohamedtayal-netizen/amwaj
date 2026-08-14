@@ -8,6 +8,14 @@
   ],
   "rewrites": [
     {
+      "source": "/admin/reset-password",
+      "destination": "/admin/reset-password/index.html"
+    },
+    {
+      "source": "/admin/reset-password/:path*",
+      "destination": "/admin/reset-password/index.html"
+    },
+    {
       "source": "/admin/:path*",
       "destination": "/admin/index.html"
     },

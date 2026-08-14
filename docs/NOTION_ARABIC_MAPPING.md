@@ -82,6 +82,7 @@
 | `Invite Admin` | دعوة مدير |
 | `Disable Admin` | تعطيل مدير |
 | `Reactivate Admin` | إعادة تفعيل مدير |
+| `Send Password Reset` | إرسال رابط تعيين كلمة المرور |
 | `Sync` | مزامنة |
 | `No Action` | بدون إجراء |
 | `Ready` | جاهز للتنفيذ |

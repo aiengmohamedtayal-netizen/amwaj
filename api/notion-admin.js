@@ -18,7 +18,7 @@ const MAX_NOTION_BLOCKS = 500;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SAFE_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const PROCESSABLE_EVENT_TYPES = new Set(['page.created', 'page.properties_updated', 'page.content_updated']);
-const ACTIONS = new Set(['Create', 'Update', 'Publish', 'Archive', 'Delete', 'Invite Admin', 'Disable Admin', 'Reactivate Admin', 'Sync']);
+const ACTIONS = new Set(['Create', 'Update', 'Publish', 'Archive', 'Delete', 'Invite Admin', 'Disable Admin', 'Reactivate Admin', 'Send Password Reset', 'Sync']);
 const ENTITY_NAMES = new Set(['Package', 'Destination', 'Service', 'Pricing Offer', 'Blog Category', 'Blog Post', 'Review', 'Setting', 'Admin User']);
 
 // The code uses stable internal keys while the Notion workspace is fully Arabic.
@@ -47,7 +47,7 @@ const NOTION_PROPERTY_AR = {
 
 const SELECT_VALUE_AR = {
   'No Action': 'بدون إجراء', Create: 'إنشاء', Update: 'تعديل', Publish: 'نشر', Archive: 'أرشفة', Delete: 'حذف',
-  'Invite Admin': 'دعوة مدير', 'Disable Admin': 'تعطيل مدير', 'Reactivate Admin': 'إعادة تفعيل مدير', Sync: 'مزامنة',
+  'Invite Admin': 'دعوة مدير', 'Disable Admin': 'تعطيل مدير', 'Reactivate Admin': 'إعادة تفعيل مدير', 'Send Password Reset': 'إرسال رابط تعيين كلمة المرور', Sync: 'مزامنة',
   Package: 'برنامج', Destination: 'وجهة', Service: 'خدمة', 'Pricing Offer': 'عرض سعر', 'Blog Category': 'تصنيف مدونة',
   'Blog Post': 'مقال مدونة', Review: 'رأي عميل', Setting: 'إعداد موقع', 'Admin User': 'مدير النظام',
   Ready: 'جاهز للتنفيذ', Processing: 'جارٍ التنفيذ', Completed: 'اكتمل', Failed: 'فشل', 'Needs Review': 'يحتاج مراجعة',
@@ -89,7 +89,7 @@ function configuration() {
     notionDataSourceId: env('NOTION_ADMIN_DATA_SOURCE_ID'),
     webhookToken: env('NOTION_WEBHOOK_VERIFICATION_TOKEN'),
     notionVersion: env('NOTION_API_VERSION', DEFAULT_NOTION_VERSION),
-    authRedirectTo: env('SUPABASE_AUTH_REDIRECT_TO', 'https://amwaj-virid.vercel.app/admin/'),
+    authRedirectTo: env('SUPABASE_AUTH_REDIRECT_TO', 'https://amwaj-virid.vercel.app/admin/reset-password/'),
   };
 }
 
@@ -613,17 +613,19 @@ async function inviteAdmin(config, page) {
 async function updateAdmin(config, userId, page) {
   ensureUuid(userId, 'Auth User ID');
   const fullName = trimText(stringProperty(page, 'Name'), 240);
+  const email = nullableText(stringProperty(page, 'Email'), 320)?.toLowerCase() || null;
   if (!fullName) throw error('Name is required.');
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw error('Email is invalid.');
   await authAdminRequest(config, `/auth/v1/admin/users/${encodeURIComponent(userId)}`, {
     method: 'PUT',
-    body: JSON.stringify({ user_metadata: { full_name: fullName } }),
+    body: JSON.stringify({ user_metadata: { full_name: fullName }, ...(email ? { email } : {}) }),
   });
   const profiles = await supabaseRequest(config, `/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}`, {
     method: 'PATCH',
     headers: { Prefer: 'return=representation' },
     body: JSON.stringify({ full_name: fullName }),
   });
-  return { id: userId, full_name: fullName, profile: Array.isArray(profiles) ? profiles[0] || null : profiles };
+  return { id: userId, email, full_name: fullName, profile: Array.isArray(profiles) ? profiles[0] || null : profiles };
 }
 
 async function setAdminEnabled(config, userId, enabled) {
@@ -644,6 +646,17 @@ async function deleteAdmin(config, userId) {
   ensureUuid(userId, 'Auth User ID');
   await supabaseRequest(config, `/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}`, { method: 'DELETE' });
   await authAdminRequest(config, `/auth/v1/admin/users/${encodeURIComponent(userId)}`, { method: 'DELETE' });
+}
+
+async function sendAdminPasswordReset(config, userId, page) {
+  ensureUuid(userId, 'Auth User ID');
+  const email = trimText(stringProperty(page, 'Email'), 320).toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw error('Email is invalid.');
+  await authAdminRequest(config, '/auth/v1/recover', {
+    method: 'POST',
+    body: JSON.stringify({ email, redirect_to: config.authRedirectTo }),
+  });
+  return { id: userId, email, password_reset_email_sent: true };
 }
 
 function archivePatch(entity, existing) {
@@ -709,6 +722,10 @@ async function executeAdminAction(config, page, action) {
   if (action === 'Reactivate Admin') {
     const record = await setAdminEnabled(config, authUserId, true);
     return { operation: 'reactivate', entity: 'Admin User', externalId: authUserId, record };
+  }
+  if (action === 'Send Password Reset') {
+    const record = await sendAdminPasswordReset(config, authUserId, page);
+    return { operation: 'password_reset', entity: 'Admin User', externalId: authUserId, record };
   }
   if (action === 'Delete') {
     if (!checkboxProperty(page, 'Confirm Delete')) throw error('Delete requires Confirm Delete to be checked.');
