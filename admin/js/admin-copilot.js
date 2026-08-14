@@ -27,6 +27,22 @@
     return result || fallback;
   }
 
+  function currentPageContext() {
+    const route = `${window.location.pathname.replace(/\/+$/, '') || '/'}${window.location.pathname.endsWith('/') ? '' : '/'}`;
+    const entityByRoute = {
+      '/admin/destinations/': 'destinations', '/admin/packages/': 'packages', '/admin/services/': 'services',
+      '/admin/pricing/': 'pricing_offers', '/admin/blog/': 'blog_posts', '/admin/reviews/': 'customer_reviews', '/admin/settings/': 'site_settings'
+    };
+    const selectedId = Array.from(document.querySelectorAll('dialog[open] [data-id]'))
+      .map((node) => text(node.dataset.id, ''))
+      .find(Boolean) || '';
+    return { route: routes[route] ? route : '/admin/', entity: entityByRoute[route] || '', mode: selectedId ? 'editor' : (route === '/admin/pricing/' ? 'pricing' : 'list'), recordId: selectedId };
+  }
+
+  function requestId() {
+    return window.crypto?.randomUUID?.() || null;
+  }
+
   function actionName(mutation) {
     const verbs = { create: 'إضافة', update: 'تعديل', delete: 'حذف' };
     const nouns = {
@@ -69,6 +85,7 @@
           <div class="admin-copilot-head-actions"><button type="button" class="admin-copilot-icon-button" data-copilot="language" aria-label="التبديل إلى الإنجليزية" title="Arabic / English">ع</button><button type="button" class="admin-copilot-icon-button" data-copilot="close" aria-label="إغلاق المساعد"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div>
         </header>
         <div class="admin-copilot-notice"><i class="fa-solid fa-circle-info" aria-hidden="true"></i><span>ارفع صورة أو ملف Excel أو Word (.docx) ليحلله المساعد. لن يُنفذ أي تغيير قبل تأكيدك.</span></div>
+        <div id="admin-copilot-context" class="admin-copilot-context" aria-live="polite"></div>
         <div id="admin-copilot-messages" class="admin-copilot-messages" aria-live="polite" aria-relevant="additions text">
           <article class="copilot-message copilot-message-assistant"><div class="copilot-message-mark"><i class="fa-solid fa-sparkles" aria-hidden="true"></i></div><div class="copilot-message-body"><p>مرحباً. اسألني عن الأسعار أو المحتوى أو آراء العملاء، أو اطلب مني إعداد تعديل وسأعرضه عليك للتأكيد أولاً.</p></div></article>
         </div>
@@ -96,6 +113,15 @@
     if (node) node.scrollTop = node.scrollHeight;
   }
 
+  function updateContextIndicator() {
+    const node = document.getElementById('admin-copilot-context');
+    if (!node) return;
+    const context = currentPageContext();
+    const section = routes[context.route] || 'لوحة التحكم';
+    const recordNote = context.recordId ? ' · سجل مفتوح للتحقق' : '';
+    node.innerHTML = `<i class="fa-solid fa-location-dot" aria-hidden="true"></i><span>السياق الحالي: ${escapeHtml(section)}${escapeHtml(recordNote)}</span>`;
+  }
+
   function appendMessage(role, content, extra = {}) {
     const list = messages();
     if (!list) return;
@@ -105,6 +131,12 @@
     article.innerHTML = `${mark}<div class="copilot-message-body"><p>${escapeHtml(content)}</p></div>`;
     list.append(article);
 
+    if (role === 'assistant' && extra.verified === true) {
+      const verified = document.createElement('p');
+      verified.className = 'copilot-verified-note';
+      verified.innerHTML = '<i class="fa-solid fa-shield-halved" aria-hidden="true"></i> إجابة مستندة إلى بيانات حية تحقّق منها الخادم';
+      article.querySelector('.copilot-message-body').append(verified);
+    }
     if (role === 'assistant' && Array.isArray(extra.sources) && extra.sources.length) {
       const sourceText = extra.sources.map((source) => source.label).filter(Boolean).slice(0, 4).join(' • ');
       if (sourceText) {
@@ -128,7 +160,17 @@
       if (nav.childElementCount) article.querySelector('.copilot-message-body').append(nav);
     }
     if (role === 'assistant' && extra.proposedMutation) appendMutationCard(extra.proposedMutation, article.querySelector('.copilot-message-body'));
+    if (role === 'assistant' && extra.execution) appendExecutionStatus(extra.execution, article.querySelector('.copilot-message-body'));
     scrollToLatest();
+  }
+
+  function appendExecutionStatus(result, parent) {
+    const verification = result?.verification || {};
+    const status = document.createElement('p');
+    status.className = `copilot-execution-status${verification.exists === false ? ' is-deleted' : ''}`;
+    const summary = verification.record?.title ? `السجل المتحقق منه: ${verification.record.title}` : verification.exists === false ? 'تم التحقق من عدم بقاء السجل بعد الحذف.' : 'تم التحقق من النتيجة من البيانات الحية.';
+    status.innerHTML = `<i class="fa-solid fa-circle-check" aria-hidden="true"></i> ${escapeHtml(summary)}${result.auditLogged === false ? ' — تعذر حفظ سجل التدقيق، لكن النتيجة تحققت من البيانات.' : ''}`;
+    parent.append(status);
   }
 
   function appendMutationCard(mutation, parent) {
@@ -310,20 +352,21 @@
   }
 
   async function ask(question) {
+    updateContextIndicator();
     const message = text(question);
     if (!message || state.busy) return;
     appendMessage('user', message);
     state.history.push({ role: 'user', content: message });
-    state.history = state.history.slice(-6);
+    state.history = state.history.slice(-10);
     if (input()) input().value = '';
     setBusy(true);
     appendTyping();
     try {
-      const result = await request({ mode: 'chat', message, history: state.history.slice(0, -1), language: state.language, attachments: state.attachments, document: state.documentAttachment });
+      const result = await request({ mode: 'chat', requestId: requestId(), pageContext: currentPageContext(), message, history: state.history.slice(0, -1), language: state.language, attachments: state.attachments, document: state.documentAttachment });
       const reply = result.reply || {};
       appendMessage('assistant', text(reply.answer, 'لم أتمكن من استخراج إجابة موثوقة الآن.'), reply);
       state.history.push({ role: 'assistant', content: text(reply.answer) });
-      state.history = state.history.slice(-6);
+      state.history = state.history.slice(-10);
     } catch (error) {
       appendMessage('assistant', error.message || 'حدث خطأ أثناء تشغيل مساعد الإدارة.');
     } finally {
@@ -343,13 +386,13 @@
     setBusy(true);
     appendTyping();
     try {
-      const result = await request({ mode: 'execute', confirmed: true, mutation, attachments: state.attachments });
+      const result = await request({ mode: 'execute', requestId: requestId(), pageContext: currentPageContext(), confirmed: true, mutation, attachments: state.attachments });
       state.pendingMutation = null;
       if (result?.result?.operation === 'create' && result?.result?.entity === 'packages') {
         state.attachments = [];
         renderAttachments();
       }
-      appendMessage('assistant', text(result.message, 'تم تنفيذ الإجراء بعد التأكيد.'));
+      appendMessage('assistant', text(result.message, 'تم تنفيذ الإجراء بعد التأكيد.'), { execution: result.result });
       window.dispatchEvent(new CustomEvent('amwaj:copilot-mutated', { detail: result.result }));
       const cards = document.querySelectorAll('.copilot-mutation-card');
       cards.forEach((card) => { card.classList.add('is-complete'); card.querySelectorAll('button').forEach((button) => { button.disabled = true; }); });
@@ -366,6 +409,7 @@
     const panel = document.getElementById('admin-copilot-panel');
     const launcher = document.querySelector('.admin-copilot-launcher');
     if (!panel || !launcher) return;
+    if (state.open) updateContextIndicator();
     panel.classList.toggle('is-open', state.open);
     panel.setAttribute('aria-hidden', String(!state.open));
     launcher.setAttribute('aria-expanded', String(state.open));
@@ -437,6 +481,7 @@
       const auth = await window.AmwajAdminClient.requireAdmin();
       if (!auth?.isAdmin) return;
       shell();
+      updateContextIndicator();
       renderAttachments();
       bindEvents();
       try { if (sessionStorage.getItem(storageKey) === 'true') setOpen(true, { focus: false }); } catch { /* no storage required */ }

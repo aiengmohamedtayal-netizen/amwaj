@@ -423,3 +423,75 @@ body { overflow-x: hidden; }
 .admin-copilot-attachment button:hover { color: #b42318; background: #fee4e2; }
 .admin-copilot-upload:disabled { opacity: .58; cursor: wait; }
 @media (max-width: 640px) { .admin-copilot-composer { gap: .4rem; padding-inline: .65rem; } .admin-copilot-upload, .admin-copilot-send { inline-size: 2.45rem; block-size: 2.45rem; } .admin-copilot-attachments { padding-inline: .65rem; } }
+
+/* Verified outcome returned by the admin copilot after a confirmed server action. */
+.copilot-execution-status {
+  display: flex;
+  align-items: flex-start;
+  gap: .45rem;
+  margin: .7rem 0 0;
+  padding: .55rem .65rem;
+  border: 1px solid rgba(0, 194, 168, .28);
+  border-radius: .65rem;
+  background: rgba(0, 194, 168, .08);
+  color: #0a6f63;
+  font-size: .8rem;
+  line-height: 1.6;
+}
+
+.copilot-execution-status > i { margin-top: .25rem; color: #00a98f; }
+.copilot-execution-status.is-deleted {
+  border-color: rgba(239, 68, 68, .25);
+  background: rgba(239, 68, 68, .07);
+  color: #a12626;
+}
+.copilot-execution-status.is-deleted > i { color: #d33b3b; }
+
+body.dark-mode .copilot-execution-status {
+  background: rgba(0, 194, 168, .13);
+  color: #9deadd;
+}
+body.dark-mode .copilot-execution-status.is-deleted {
+  background: rgba(239, 68, 68, .12);
+  color: #ffb5b5;
+}
+
+.copilot-verified-note {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  margin: .65rem 0 0;
+  color: #087f5b;
+  font-size: .76rem;
+  font-weight: 700;
+}
+
+.copilot-verified-note .fa-shield-halved { color: #0099D8; }
+
+@media (max-width: 480px) {
+  .copilot-verified-note { font-size: .72rem; line-height: 1.55; }
+}
+
+/* Trusted admin-copilot context indicator */
+.admin-copilot-context {
+  display: flex;
+  align-items: center;
+  gap: .48rem;
+  margin: .55rem 1rem 0;
+  padding: .55rem .7rem;
+  color: #256f8f;
+  background: #eef9fe;
+  border: 1px solid #c7eaf8;
+  border-radius: .7rem;
+  font-size: .76rem;
+  line-height: 1.45;
+}
+.admin-copilot-context i { color: var(--color-primary, #0099D8); }
+body.dark-mode .admin-copilot-context {
+  color: #bceeff;
+  background: rgba(0,153,216,.12);
+  border-color: rgba(0,194,168,.28);
+}
+@media (max-width: 480px) {
+  .admin-copilot-context { margin-inline: .75rem; font-size: .72rem; }
+}
