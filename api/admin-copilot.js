@@ -27,8 +27,8 @@ const ENTITY_CONFIG = Object.freeze({
   },
   services: {
     table: 'services', idField: 'id', route: '/admin/services/', label: 'الخدمات',
-    readFields: 'id,slug,title_ar,title_en,category,status,is_active,icon_class,updated_at',
-    fields: ['slug', 'category', 'title_ar', 'title_en', 'description_ar', 'description_en', 'icon_class', 'status', 'is_active', 'sort_order']
+    readFields: 'id,slug,title_ar,title_en,status,is_active,icon_class,updated_at',
+    fields: ['slug', 'title_ar', 'title_en', 'description_ar', 'description_en', 'icon_class', 'status', 'is_active', 'sort_order']
   },
   pricing_offers: {
     table: 'pricing_offers', idField: 'id', route: '/admin/pricing/', label: 'عروض الأسعار',
