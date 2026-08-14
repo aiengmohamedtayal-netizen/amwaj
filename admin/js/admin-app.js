@@ -885,11 +885,11 @@
   });
 
   const SETTING_FIELD_LABELS = Object.freeze({
-    name_ar: 'الاسم بالعربية', name_en: 'الاسم بالإنجليزية', incorporation_date: 'تاريخ التأسيس', chairman: 'رئيس مجلس الإدارة', chairman_ar: 'رئيس مجلس الإدارة بالعربية', chairman_en: 'رئيس مجلس الإدارة بالإنجليزية', etaa_membership: 'عضوية ETAA', licence_number: 'رقم الترخيص', license_number: 'رقم الترخيص', licence_category: 'فئة الترخيص', license_category: 'فئة الترخيص', responsible_manager: 'المدير المسؤول', email: 'البريد الإلكتروني', landline: 'الهاتف الأرضي', phone: 'رقم الهاتف', address_ar: 'العنوان بالعربية', address_en: 'العنوان بالإنجليزية', whatsapp_numbers: 'أرقام واتساب', city_ar: 'المدينة بالعربية', city_en: 'المدينة بالإنجليزية', latitude: 'خط العرض', longitude: 'خط الطول', map_embed_url: 'رابط الخريطة', title: 'عنوان الصفحة', canonical_url: 'الرابط الأساسي', description_ar: 'الوصف بالعربية', website: 'الموقع الإلكتروني', facebook: 'Facebook', whatsapp: 'WhatsApp', etaa: 'ETAA'
+    name_ar: 'الاسم بالعربية', name_en: 'الاسم بالإنجليزية', founded_on: 'تاريخ التأسيس', chairman: 'رئيس مجلس الإدارة', chairman_ar: 'رئيس مجلس الإدارة بالعربية', chairman_en: 'رئيس مجلس الإدارة بالإنجليزية', etaa_member: 'عضو في ETAA', licence_number: 'رقم الترخيص', license_number: 'رقم الترخيص', licence_category: 'فئة الترخيص', license_category: 'فئة الترخيص', license_category_ar: 'فئة الترخيص بالعربية', license_category_en: 'فئة الترخيص بالإنجليزية', responsible_manager: 'المدير المسؤول', responsible_manager_ar: 'المدير المسؤول', responsible_manager_en: 'المدير المسؤول بالإنجليزية', email: 'البريد الإلكتروني', landline: 'الهاتف الأرضي', phone: 'رقم الهاتف', mobile_whatsapp: 'أرقام واتساب', address_ar: 'العنوان بالعربية', address_en: 'العنوان بالإنجليزية', city_ar: 'المدينة بالعربية', city_en: 'المدينة بالإنجليزية', latitude: 'خط العرض', longitude: 'خط الطول', map_embed_url: 'رابط تضمين الخريطة', title: 'عنوان ظهور الموقع', canonical_url: 'الرابط الأساسي للموقع', description_ar: 'الوصف بالعربية', website: 'الموقع الرسمي', facebook: 'فيسبوك', whatsapp: 'واتساب', etaa: 'رابط عضوية ETAA'
   });
 
   const SETTING_ADVANCED_FIELDS = Object.freeze({
-    company_identity: ['incorporation_date', 'chairman', 'chairman_ar', 'chairman_en', 'etaa_membership', 'etaa', 'licence_number', 'license_number', 'licence_category', 'license_category', 'responsible_manager'],
+    company_identity: ['founded_on', 'chairman', 'chairman_ar', 'chairman_en', 'etaa_member', 'etaa', 'licence_number', 'license_number', 'licence_category', 'license_category', 'license_category_ar', 'license_category_en', 'responsible_manager', 'responsible_manager_ar', 'responsible_manager_en'],
     contact: [],
     location: ['latitude', 'longitude', 'map_embed_url'],
     site_meta: ['canonical_url'],
