@@ -80,7 +80,8 @@ function safeJson(value) {
 }
 
 function clientIp(req) {
-  return String(req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown').split(',')[0].trim();
+  const forwarded = req.headers['x-vercel-forwarded-for'] || req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown';
+  return String(forwarded).split(',')[0].trim();
 }
 
 function allowedOrigin(origin) {

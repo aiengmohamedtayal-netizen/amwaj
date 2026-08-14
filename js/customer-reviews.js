@@ -142,14 +142,15 @@
             submit.classList.add('opacity-60', 'cursor-not-allowed');
         }
         try {
-            const response = await fetch(`${config.url}/rest/v1/customer_reviews`, {
+            const response = await fetch('/api/reviews', {
                 method: 'POST',
-                headers: {
-                    apikey: config.publishableKey,
-                    'Content-Type': 'application/json',
-                    Prefer: 'return=minimal'
-                },
-                body: JSON.stringify({ customer_name: customerName, rating, review_text: reviewText })
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    customer_name: customerName,
+                    rating,
+                    review_text: reviewText,
+                    company_website: honeypot
+                })
             });
             if (!response.ok) throw new Error(`Customer review submission failed (${response.status})`);
             localStorage.setItem(cooldownKey, String(Date.now() + cooldownMs));

@@ -6,7 +6,18 @@
   const editorPrefillStorageKey = 'amwaj_admin_copilot_editor_prefill';
   const MAX_DOCUMENT_BYTES = 5 * 1024 * 1024;
   const MAX_DOCUMENT_TEXT = 24000;
-  const state = { open: false, busy: false, language: 'ar', history: [], pendingMutation: null, attachments: [], documentAttachment: null, editorPrefills: new Map(), prefillSequence: 0 };
+  const state = { open: false, busy: false, language: 'ar', lifecycle: 'idle', history: [], pendingMutation: null, attachments: [], documentAttachment: null, editorPrefills: new Map(), prefillSequence: 0 };
+  const parserLoads = new Map();
+  const documentParsers = Object.freeze({
+    excel: { global: 'XLSX', src: 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js', integrity: 'sha512-r22gChDnGvBylk90+2e/ycr3RVrDi8DIOkIGNhJlKfuyQM4tIRAI062MaV8sfjQKYVGjOBaZBOA87z+IhZE9DA==' },
+    word: { global: 'mammoth', src: 'https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.9.1/mammoth.browser.min.js', integrity: 'sha512-N4Uo11qseyexXRHHXEqTzmr6paAgBuR3KKv3XLEYoAEYKUYAmbt3dagx3R3YQKZ8NLtwFfnqSOFnH45O1MY0Iw==' }
+  });
+
+  function setLifecycle(status) {
+    const previous = state.lifecycle;
+    state.lifecycle = status;
+    if (previous !== status) window.dispatchEvent(new CustomEvent('amwaj:admin-copilot-statechange', { detail: { status, previous } }));
+  }
 
   const routes = Object.freeze({
     '/admin/': 'لوحة التحكم',
@@ -188,6 +199,7 @@
     const route = routeByEntity[prefill?.entity];
     if (!prefill || !route) return;
     try { sessionStorage.setItem(editorPrefillStorageKey, JSON.stringify(prefill)); } catch { appendMessage('assistant', 'تعذر تجهيز المسودة في المتصفح. أعد المحاولة.'); return; }
+    setLifecycle('editor-review');
     setOpen(false, { focus: false });
     window.location.assign(route);
   }
@@ -273,6 +285,26 @@
     }
   }
 
+  function loadDocumentParser(kind) {
+    const parser = documentParsers[kind];
+    if (!parser) return Promise.reject(new Error('محلل المستند المطلوب غير مدعوم.'));
+    if (window[parser.global]) return Promise.resolve(window[parser.global]);
+    if (parserLoads.has(kind)) return parserLoads.get(kind);
+    const loading = new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = parser.src;
+      script.integrity = parser.integrity;
+      script.crossOrigin = 'anonymous';
+      script.referrerPolicy = 'no-referrer';
+      script.dataset.amwajDocumentParser = kind;
+      script.onload = () => window[parser.global] ? resolve(window[parser.global]) : reject(new Error('تم تحميل محلل المستند لكن لم يصبح متاحًا.'));
+      script.onerror = () => reject(new Error('تعذر تحميل محلل المستند. تحقق من اتصال الإنترنت ثم أعد المحاولة.'));
+      document.head.append(script);
+    }).catch((error) => { parserLoads.delete(kind); throw error; });
+    parserLoads.set(kind, loading);
+    return loading;
+  }
+
   function tidyDocumentText(value, max = 600) {
     return String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
   }
@@ -296,10 +328,10 @@
     if (!kind) throw new Error('الصيغ المدعومة هي Excel ‏(.xlsx و.xls و.csv) وWord ‏(.docx) فقط.');
     const arrayBuffer = await file.arrayBuffer();
     if (kind === 'excel') {
-      if (!window.XLSX) throw new Error('تعذر تحميل محلل Excel. حدّث الصفحة ثم حاول مرة أخرى.');
-      const workbook = window.XLSX.read(arrayBuffer, { type: 'array', cellFormula: false, cellHTML: false, cellText: true });
+      const xlsx = await loadDocumentParser('excel');
+      const workbook = xlsx.read(arrayBuffer, { type: 'array', cellFormula: false, cellHTML: false, cellText: true });
       const sections = workbook.SheetNames.slice(0, 5).map((sheetName) => {
-        const rows = window.XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, defval: '', raw: false, blankrows: false })
+        const rows = xlsx.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, defval: '', raw: false, blankrows: false })
           .slice(0, 121)
           .map((row) => row.map((cell) => tidyDocumentText(cell, 240)).join(' | '))
           .filter(Boolean);
@@ -309,8 +341,8 @@
       if (!content) throw new Error('ملف Excel لا يحتوي على بيانات قابلة للقراءة.');
       return { kind, name: tidyDocumentText(file.name, 180), mimeType: file.type || 'application/vnd.ms-excel', content };
     }
-    if (!window.mammoth) throw new Error('تعذر تحميل محلل Word. حدّث الصفحة ثم حاول مرة أخرى.');
-    const result = await window.mammoth.extractRawText({ arrayBuffer });
+    const mammoth = await loadDocumentParser('word');
+    const result = await mammoth.extractRawText({ arrayBuffer });
     const content = cutDocumentText(String(result.value || '').split(/\n+/).map((line) => tidyDocumentText(line, 1200)).filter(Boolean).join('\n'));
     if (!content) throw new Error('ملف Word لا يحتوي على نص قابل للقراءة.');
     return { kind, name: tidyDocumentText(file.name, 180), mimeType: file.type || 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', content };
@@ -384,6 +416,7 @@
     const message = text(question);
     if (!message || state.busy) return;
     appendMessage('user', message);
+    setLifecycle('loading');
     state.history.push({ role: 'user', content: message });
     state.history = state.history.slice(-10);
     if (input()) input().value = '';
@@ -393,10 +426,14 @@
       const result = await request({ mode: 'chat', requestId: requestId(), pageContext: currentPageContext(), message, history: state.history.slice(0, -1), language: state.language, attachments: state.attachments, document: state.documentAttachment });
       const reply = result.reply || {};
       appendMessage('assistant', text(reply.answer, 'لم أتمكن من استخراج إجابة موثوقة الآن.'), reply);
+      if (reply.editorPrefill) setLifecycle('draft-ready');
+      else if (reply.proposedMutation) setLifecycle('proposed');
+      else setLifecycle('success');
       state.history.push({ role: 'assistant', content: text(reply.answer) });
       state.history = state.history.slice(-10);
     } catch (error) {
       appendMessage('assistant', error.message || 'حدث خطأ أثناء تشغيل مساعد الإدارة.');
+      setLifecycle('error');
     } finally {
       removeTyping();
       setBusy(false);
@@ -411,6 +448,7 @@
       ? 'سيتم حذف هذا السجل نهائياً. هل تريد المتابعة؟'
       : 'سيتم حفظ التغيير في بيانات أمواج الحية. هل تريد المتابعة؟';
     if (!window.confirm(confirmText)) return;
+    setLifecycle('executing');
     setBusy(true);
     appendTyping();
     try {
@@ -421,11 +459,13 @@
         renderAttachments();
       }
       appendMessage('assistant', text(result.message, 'تم تنفيذ الإجراء بعد التأكيد.'), { execution: result.result });
+      setLifecycle('verified');
       window.dispatchEvent(new CustomEvent('amwaj:copilot-mutated', { detail: result.result }));
       const cards = document.querySelectorAll('.copilot-mutation-card');
       cards.forEach((card) => { card.classList.add('is-complete'); card.querySelectorAll('button').forEach((button) => { button.disabled = true; }); });
     } catch (error) {
       appendMessage('assistant', error.message || 'تعذر تنفيذ الإجراء المطلوب.');
+      setLifecycle('error');
     } finally {
       removeTyping();
       setBusy(false);

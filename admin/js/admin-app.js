@@ -28,7 +28,9 @@
       categories: [], image: false, featured: false
     }
   };
-  const state = { auth: null, page: 'dashboard', collections: {}, search: '' };
+  const adminStore = window.AmwajAdminState?.create({ auth: null, page: 'dashboard', collections: {}, search: '' });
+  const state = adminStore?.state || { auth: null, page: 'dashboard', collections: {}, search: '' };
+  const invalidateServerState = (...keys) => adminStore?.invalidate(keys);
   const editorPrefillStorageKey = 'amwaj_admin_copilot_editor_prefill';
   const draftFallbacks = {
     imageUrl: '/assets/logo.png',
@@ -462,6 +464,7 @@
       if (payload.rating !== null && (payload.rating < 0 || payload.rating > 5)) throw new Error('التقييم غير صحيح. أدخل قيمة بين 0 و5.');
       if (button.dataset.id) await client.update(meta.table, button.dataset.id, payload); else await client.create(meta.table, payload);
       dialog.close();
+      invalidateServerState('collections', 'pricing');
       showToast('success', mode === 'published' ? 'تم نشر المحتوى' : 'تم حفظ المسودة', mode === 'published' ? 'أصبح المحتوى متاحًا للزوار.' : `${meta.singular} جاهز للمراجعة لاحقًا.`);
       await renderCollection(kind);
     } catch (error) {
@@ -480,6 +483,7 @@
       if (action === 'featured') await client.update(meta.table, id, { is_featured: !item.is_featured });
       if (action === 'archive') await client.update(meta.table, id, { is_active: false });
       if (action === 'restore') await client.update(meta.table, id, { is_active: true });
+      invalidateServerState('collections', 'pricing');
       showToast('success', 'تم تحديث العنصر', action === 'archive' ? 'تمت الأرشفة.' : action === 'restore' ? 'تمت إعادة التفعيل.' : 'تم تحديث حالة التمييز.');
       await renderCollection(kind);
     } catch (error) { showToast('error', 'تعذر تحديث العنصر', error.message); }
@@ -493,6 +497,7 @@
     if (!window.confirm(`هل تريد حذف ${meta.singular} «${item.title_ar}» نهائيًا؟\nلا يمكن التراجع عن هذا الإجراء.${offerNote}`)) return;
     try {
       await client.remove(meta.table, id);
+      invalidateServerState('collections', 'pricing');
       showToast('success', 'تم حذف العنصر', `حُذفت ${meta.singular} من قاعدة البيانات.`);
       await renderCollection(kind);
     } catch (error) { showToast('error', 'تعذر حذف العنصر', error.message); }
@@ -688,6 +693,7 @@
       const payload = offerPayload(row);
       setButtonBusy(button, true);
       await client.update('pricing_offers', button.dataset.id, payload);
+      invalidateServerState('pricing');
       showToast('success', 'تم حفظ صف السعر', 'تم تحديث العرض في قاعدة البيانات المركزية.');
       await renderPricing();
     } catch (error) { showToast('error', 'تعذر حفظ صف السعر', error.message); setButtonBusy(button, false); }
@@ -700,6 +706,7 @@
     if (!window.confirm(`هل تريد حذف عرض السعر المرتبط بـ «${subject.title_ar}» نهائيًا؟\nلن يظهر هذا العرض في محرك البحث بعد الحذف.`)) return;
     try {
       await client.remove('pricing_offers', id);
+      invalidateServerState('pricing');
       showToast('success', 'تم حذف عرض السعر', 'أُزيل العرض من محرك البحث وقاعدة البيانات.');
       await renderPricing();
     } catch (error) { showToast('error', 'تعذر حذف عرض السعر', error.message); }
@@ -713,6 +720,7 @@
       const payload = offerPayload(form, button.dataset.status);
       setButtonBusy(button, true);
       if (button.dataset.id) await client.update('pricing_offers', button.dataset.id, payload); else await client.create('pricing_offers', payload);
+      invalidateServerState('pricing');
       dialog.close();
       showToast('success', button.dataset.status === 'published' ? 'تم نشر عرض السعر' : 'تم حفظ عرض السعر كمسودة', 'أصبح العرض محفوظًا في Supabase.');
       await renderPricing();
@@ -770,6 +778,7 @@
     if (!window.confirm(`هل تريد ${action} رأي «${review.customer_name}»؟\n${impact}`)) return;
     try {
       await client.update('customer_reviews', id, { status, reviewed_at: new Date().toISOString() });
+      invalidateServerState('reviews');
       showToast('success', status === 'approved' ? 'تم اعتماد الرأي' : 'تم رفض الرأي', impact);
       await renderReviews();
     } catch (error) { showToast('error', `تعذر ${action} الرأي`, error.message); }
@@ -781,6 +790,7 @@
     if (!window.confirm(`هل تريد حذف رأي «${review.customer_name}» نهائيًا؟\nلا يمكن التراجع عن هذا الإجراء.`)) return;
     try {
       await client.remove('customer_reviews', id);
+      invalidateServerState('reviews');
       showToast('success', 'تم حذف الرأي', 'أُزيل الرأي من قائمة المراجعات والموقع العام إن كان معتمدًا.');
       await renderReviews();
     } catch (error) { showToast('error', 'تعذر حذف الرأي', error.message); }
@@ -810,7 +820,7 @@
     try { value = JSON.parse(fieldElement.value); } catch { showToast('error', 'صيغة JSON غير صحيحة', 'تحقق من الأقواس والفواصل ثم حاول مرة أخرى.'); fieldElement.focus(); return; }
     if (Array.isArray(value) || value === null || typeof value !== 'object') { showToast('error', 'قيمة غير مدعومة', 'يجب أن تكون القيمة كائن JSON وليس قائمة أو نصًا منفردًا.'); return; }
     setButtonBusy(button, true);
-    try { await client.updateSetting(button.dataset.key, { value }); dialog.close(); showToast('success', 'تم حفظ الإعداد', 'تم تحديث الإعداد المركزي.'); await renderSettings(); } catch (error) { showToast('error', 'تعذر حفظ الإعداد', error.message); setButtonBusy(button, false); }
+    try { await client.updateSetting(button.dataset.key, { value }); invalidateServerState('settings'); dialog.close(); showToast('success', 'تم حفظ الإعداد', 'تم تحديث الإعداد المركزي.'); await renderSettings(); } catch (error) { showToast('error', 'تعذر حفظ الإعداد', error.message); setButtonBusy(button, false); }
   }
 
   function blogRoute() {
@@ -919,6 +929,7 @@
         if (issues.length) throw new Error(`للنشر، أكمل: ${issues.join('، ')}.`);
       }
       if (existing) await client.update('blog_posts', existing.id, payload); else await client.create('blog_posts', payload);
+      invalidateServerState('blog');
       dialog.close();
       showToast('success', button.dataset.status === 'published' ? 'تم نشر المقال' : 'تم حفظ المسودة', 'تُعرض المقالات المنشورة فقط للزائر.');
       await renderBlog();
@@ -951,7 +962,7 @@
     const existing = (state.blog?.categories || []).find((category) => category.id === button.dataset.id);
     const payload = { slug, title_ar: values.title_ar.trim(), title_en: values.title_en.trim(), description_ar: values.description_ar.trim() || null, description_en: values.description_en.trim() || null, status: existing?.status || 'active', sort_order: Math.max(0, Number(values.sort_order || 0)) };
     setButtonBusy(button, true);
-    try { if (existing) await client.update('blog_categories', existing.id, payload); else await client.create('blog_categories', payload); dialog.close(); showToast('success', 'تم حفظ التصنيف', 'يمكن الآن ربط المقالات بهذا التصنيف.'); await renderBlog(); } catch (error) { showToast('error', 'تعذر حفظ التصنيف', error.message); setButtonBusy(button, false); }
+    try { if (existing) await client.update('blog_categories', existing.id, payload); else await client.create('blog_categories', payload); invalidateServerState('blog'); dialog.close(); showToast('success', 'تم حفظ التصنيف', 'يمكن الآن ربط المقالات بهذا التصنيف.'); await renderBlog(); } catch (error) { showToast('error', 'تعذر حفظ التصنيف', error.message); setButtonBusy(button, false); }
   }
 
   async function renderBlog() {
@@ -978,7 +989,7 @@
   async function updateBlogStatus(id, status) {
     const post = (state.blog?.posts || []).find((item) => item.id === id);
     if (!post) return;
-    try { await client.update('blog_posts', id, { status, is_featured: status === 'published' ? post.is_featured : false, ...(status === 'published' ? { published_at: post.published_at || new Date().toISOString() } : {}) }); showToast('success', status === 'published' ? 'تم نشر المقال' : 'تمت أرشفة المقال', 'تم تحديث حالته في المصدر المركزي.'); await renderBlog(); } catch (error) { showToast('error', 'تعذر تحديث المقال', error.message); }
+    try { await client.update('blog_posts', id, { status, is_featured: status === 'published' ? post.is_featured : false, ...(status === 'published' ? { published_at: post.published_at || new Date().toISOString() } : {}) }); invalidateServerState('blog'); showToast('success', status === 'published' ? 'تم نشر المقال' : 'تمت أرشفة المقال', 'تم تحديث حالته في المصدر المركزي.'); await renderBlog(); } catch (error) { showToast('error', 'تعذر تحديث المقال', error.message); }
   }
 
   async function deleteBlog(id) {
@@ -986,13 +997,13 @@
     if (!post) return;
     const liveNote = post.status === 'published' ? '\nالمقال منشور الآن وسيختفي من الموقع العام فورًا.' : '';
     if (!window.confirm(`هل تريد حذف المقال «${post.title_ar}» نهائيًا؟\nلا يمكن التراجع عن هذا الإجراء.${liveNote}`)) return;
-    try { await client.remove('blog_posts', id); showToast('success', 'تم حذف المقال', 'أُزيل المقال من قاعدة البيانات ومن الموقع العام إن كان منشورًا.'); await renderBlog(); } catch (error) { showToast('error', 'تعذر حذف المقال', error.message); }
+    try { await client.remove('blog_posts', id); invalidateServerState('blog'); showToast('success', 'تم حذف المقال', 'أُزيل المقال من قاعدة البيانات ومن الموقع العام إن كان منشورًا.'); await renderBlog(); } catch (error) { showToast('error', 'تعذر حذف المقال', error.message); }
   }
 
   async function toggleBlogCategory(id) {
     const category = (state.blog?.categories || []).find((item) => item.id === id);
     if (!category) return;
-    try { await client.update('blog_categories', id, { status: category.status === 'active' ? 'archived' : 'active' }); showToast('success', 'تم تحديث التصنيف', 'تم حفظ حالة التصنيف في المصدر المركزي.'); await renderBlog(); } catch (error) { showToast('error', 'تعذر تحديث التصنيف', error.message); }
+    try { await client.update('blog_categories', id, { status: category.status === 'active' ? 'archived' : 'active' }); invalidateServerState('blog'); showToast('success', 'تم تحديث التصنيف', 'تم حفظ حالة التصنيف في المصدر المركزي.'); await renderBlog(); } catch (error) { showToast('error', 'تعذر تحديث التصنيف', error.message); }
   }
 
   async function deleteBlogCategory(id) {
@@ -1001,7 +1012,7 @@
     const linkedPosts = (state.blog?.posts || []).filter((post) => post.category_id === id).length;
     if (linkedPosts) { showToast('error', 'لا يمكن حذف التصنيف', `التصنيف مرتبط بـ ${linkedPosts} مقال؛ انقل المقالات إلى تصنيف آخر أولًا.`); return; }
     if (!window.confirm(`هل تريد حذف التصنيف «${category.title_ar}» نهائيًا؟\nلا يمكن التراجع عن هذا الإجراء.`)) return;
-    try { await client.remove('blog_categories', id); showToast('success', 'تم حذف التصنيف', 'أُزيل التصنيف من قاعدة البيانات.'); await renderBlog(); } catch (error) { showToast('error', 'تعذر حذف التصنيف', error.message); }
+    try { await client.remove('blog_categories', id); invalidateServerState('blog'); showToast('success', 'تم حذف التصنيف', 'أُزيل التصنيف من قاعدة البيانات.'); await renderBlog(); } catch (error) { showToast('error', 'تعذر حذف التصنيف', error.message); }
   }
 
   function isCompactAdminViewport() {

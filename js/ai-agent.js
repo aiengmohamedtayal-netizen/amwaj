@@ -6,6 +6,23 @@
 (function () {
     const LIVE_DATA_TTL_MS = 5 * 60 * 1000;
     let liveDataCache = { value: null, expiresAt: 0 };
+    const aiState = { chat: 'idle', planner: 'idle' };
+
+    function setAiStatus(workflow, status) {
+        const previous = aiState[workflow];
+        aiState[workflow] = status;
+        if (previous !== status) window.dispatchEvent(new CustomEvent('amwaj:ai-statechange', { detail: { workflow, status, previous } }));
+    }
+
+    function completeAiWorkflow(workflow, status) {
+        setAiStatus(workflow, status);
+        setAiStatus(workflow, 'idle');
+    }
+
+    window.AmwajAiState = Object.freeze({
+        getStatus: (workflow) => aiState[workflow] || 'idle',
+        invalidateLiveData: () => { liveDataCache = { value: null, expiresAt: 0 }; }
+    });
 
     const companyInfo = {
         name_ar: 'شركة أمواج للسياحة',
@@ -158,8 +175,13 @@
         }
     }
 
-    window.aiConversationHistory = window.aiConversationHistory || [];
+    window.aiConversationHistory = Array.isArray(window.aiConversationHistory) ? window.aiConversationHistory : [];
     function optimizeHistory(history, maxMessages = 8) { return history.length <= maxMessages ? history : history.slice(-maxMessages); }
+    function appendConversation(message) {
+        window.aiConversationHistory.push(message);
+        window.aiConversationHistory = optimizeHistory(window.aiConversationHistory);
+        return window.aiConversationHistory;
+    }
 
     async function executeServerlessStream(endpointUrl, messages, tools, onChunk) {
         const response = await fetch(endpointUrl, {
@@ -229,7 +251,7 @@ RULES:
         event?.preventDefault?.();
         const input = document.getElementById('aiChatInput');
         const message = input?.value.trim() || '';
-        if (!message) return;
+        if (!message || aiState.chat !== 'idle') return;
         const container = document.getElementById('aiChatContainer');
         const sendButton = document.getElementById('aiSendBtn');
         if (!container) return;
@@ -246,11 +268,12 @@ RULES:
         const content = assistantMessage.querySelector('.bot-content');
         container.scrollTop = container.scrollHeight;
         if (sendButton) sendButton.disabled = true;
+        setAiStatus('chat', 'loading');
         try {
-            window.aiConversationHistory.push({ role: 'user', content: message });
-            window.aiConversationHistory = optimizeHistory(window.aiConversationHistory);
+            appendConversation({ role: 'user', content: message });
             const messages = [{ role: 'system', content: systemPrompt }, ...window.aiConversationHistory];
             let result = await callAiEndpoint(messages, groqTools, (chunk) => {
+                setAiStatus('chat', 'streaming');
                 content.innerHTML = formatMarkdown(chunk);
                 container.scrollTop = container.scrollHeight;
             });
@@ -263,14 +286,17 @@ RULES:
                 messages.push({ role: 'assistant', tool_calls: [toolCall] });
                 messages.push({ role: 'tool', tool_call_id: toolCall.id || 'call_1', name: toolCall.function.name, content: toolOutput });
                 result = await callAiEndpoint(messages, null, (chunk) => {
+                    setAiStatus('chat', 'streaming');
                     content.innerHTML = formatMarkdown(chunk);
                     container.scrollTop = container.scrollHeight;
                 });
             }
-            window.aiConversationHistory.push({ role: 'assistant', content: result.text || '' });
+            appendConversation({ role: 'assistant', content: result.text || '' });
+            completeAiWorkflow('chat', 'success');
         } catch (error) {
             console.error('AI assistant error:', error);
             content.innerHTML = renderBusinessContinuationHtml();
+            completeAiWorkflow('chat', 'error');
         } finally {
             if (sendButton) sendButton.disabled = false;
             container.scrollTop = container.scrollHeight;
@@ -335,7 +361,9 @@ RULES:
         const content = document.getElementById('briefingContent');
         const payload = normalizePlannerPayload();
         if (!payload.destination && !payload.notes) { alert('يرجى اختيار وجهة أو كتابة تفاصيل الرحلة أولاً.'); return; }
+        if (aiState.planner !== 'idle') return;
         if (button) button.disabled = true;
+        setAiStatus('planner', 'loading');
         resultContainer?.classList.remove('hidden');
         if (content) content.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles fa-spin text-brand-500"></i> جاري قراءة العروض والبيانات المنشورة وإعداد الخطة...';
         try {
@@ -346,9 +374,11 @@ RULES:
             const data = await response.json().catch(() => ({}));
             if (!response.ok || !data.plan) throw new Error(data.message || 'تعذّر إنشاء الخطة الآن.');
             if (content) content.innerHTML = renderTripPlan(data.plan);
+            completeAiWorkflow('planner', 'success');
         } catch (error) {
             console.error('Trip planner error:', error);
             if (content) content.innerHTML = renderBusinessContinuationHtml();
+            completeAiWorkflow('planner', 'error');
         } finally {
             if (button) button.disabled = false;
         }

@@ -3,7 +3,8 @@
   'use strict';
 
   const config = window.AMWAJ_CONFIG?.supabase;
-  const state = { lang: localStorage.lang || 'ar', posts: [], categories: [] };
+  const initialLanguage = window.AmwajPreferences?.getLanguage?.() || document.documentElement.lang || localStorage.lang || 'ar';
+  const state = { lang: initialLanguage === 'en' ? 'en' : 'ar', posts: [], categories: [] };
   const ui = {
     ar: {
       siteName: 'أمواج للسياحة', home: 'الرئيسية', blog: 'المدونة', theme: 'تبديل المظهر', language: 'English',
@@ -20,7 +21,7 @@
   };
 
   function words() { return ui[state.lang] || ui.ar; }
-  function currentLang() { return document.documentElement.lang === 'en' ? 'en' : 'ar'; }
+  function currentLang() { return window.AmwajPreferences?.getLanguage?.() || (document.documentElement.lang === 'en' ? 'en' : 'ar'); }
   function escapeHtml(value) {
     return String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
   }
@@ -77,9 +78,6 @@
   }
   function applyLanguage(lang) {
     state.lang = lang === 'en' ? 'en' : 'ar';
-    document.documentElement.lang = state.lang;
-    document.documentElement.dir = state.lang === 'ar' ? 'rtl' : 'ltr';
-    localStorage.lang = state.lang;
     document.querySelectorAll('[data-i18n]').forEach(node => { node.textContent = words()[node.dataset.i18n] || ''; });
     document.querySelectorAll('[data-i18n-aria]').forEach(node => { node.setAttribute('aria-label', words()[node.dataset.i18nAria] || ''); });
     const detailTitle = document.body.dataset.pageTitleAr && document.body.dataset.pageTitleEn
@@ -87,8 +85,16 @@
     setDocumentTitle(detailTitle);
     window.dispatchEvent(new CustomEvent('amwajbloglanguagechange', { detail: { lang: state.lang } }));
   }
-  window.toggleLanguage = function () { applyLanguage(currentLang() === 'ar' ? 'en' : 'ar'); };
-  window.setLanguage = applyLanguage;
+
+  function setSharedLanguage(lang) {
+    if (window.AmwajPreferences?.setLanguage) return window.AmwajPreferences.setLanguage(lang, { source: 'blog' });
+    applyLanguage(lang);
+    return state.lang;
+  }
+
+  window.addEventListener('amwaj:languagechange', (event) => applyLanguage(event.detail?.language || currentLang()));
+  if (!window.setLanguage) window.setLanguage = setSharedLanguage;
+  if (!window.toggleLanguage) window.toggleLanguage = () => setSharedLanguage(currentLang() === 'ar' ? 'en' : 'ar');
 
   function initTheme() {
     const root = document.documentElement;
