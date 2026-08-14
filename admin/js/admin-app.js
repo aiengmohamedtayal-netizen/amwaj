@@ -973,5 +973,11 @@
     else syncMobileNavState(document.getElementById('admin-sidebar')?.classList.contains('is-open'));
     applyTableAffordances();
   }, { passive: true });
+  window.addEventListener('amwaj:copilot-mutated', async (event) => {
+    const result = event.detail || {};
+    const verb = result.operation === 'delete' ? 'تم الحذف' : result.operation === 'create' ? 'تمت الإضافة' : 'تم الحفظ';
+    showToast('success', verb, 'حدّث مساعد أمواج البيانات في المصدر المركزي بعد تأكيدك.');
+    await renderPage();
+  });
   initialize();
 }());
