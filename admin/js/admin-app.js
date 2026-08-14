@@ -29,6 +29,7 @@
     }
   };
   const state = { auth: null, page: 'dashboard', collections: {}, search: '' };
+  const editorPrefillStorageKey = 'amwaj_admin_copilot_editor_prefill';
   const draftFallbacks = {
     imageUrl: '/assets/logo.png',
     priceLabelAr: 'قيد التحديث',
@@ -246,6 +247,23 @@
     return `<details class="editor-advanced"><summary><span><i class="fa-solid fa-sliders" aria-hidden="true"></i> ${summary}</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i></summary><div class="editor-advanced-content form-grid">${content}</div></details>`;
   }
 
+  function copilotPrefillNotice(fields) {
+    const count = Array.isArray(fields) ? fields.length : 0;
+    if (!count) return '';
+    return `<div class="copilot-prefill-notice full" role="status"><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i><div><strong>مسودة مقترحة من مساعد الإدارة</strong><span>تمت تعبئة ${count} ${count === 1 ? 'حقل' : 'حقول'} للمراجعة فقط. لن يُحفظ أو يُنشر أي شيء قبل اختيارك أحد أزرار الحفظ.</span></div></div>`;
+  }
+
+  function markCopilotPrefill(dialog, fields) {
+    const names = Array.isArray(fields) ? fields.filter((name) => /^[a-z_]+$/.test(name)) : [];
+    names.forEach((name) => {
+      const input = dialog.querySelector(`[name="${name}"], [data-offer-field="${name}"]`);
+      if (!input) return;
+      input.closest('.field, .check-field, .media-upload-field')?.classList.add('is-copilot-prefilled');
+      const advanced = input.closest('.editor-advanced');
+      if (advanced) advanced.open = true;
+    });
+  }
+
   function englishField(label, name, value, sourceName, options) {
     const settings = options || {};
     const className = settings.full ? 'field full' : 'field';
@@ -343,10 +361,11 @@
     openDialog(`معاينة: ${row.title_ar}`, 'معاينة تحريرية فقط؛ لا تغيّر الموقع العام في هذه المرحلة.', `<article class="preview-card">${image || icon}<div class="preview-copy">${row.badge_ar ? `<span class="badge badge-featured">${escapeHtml(row.badge_ar)}</span>` : ''}<h4>${escapeHtml(row.title_ar)}</h4><p>${escapeHtml(row.description_ar)}</p>${row.price_label_ar ? `<p class="preview-price">${escapeHtml(row.price_label_ar)}</p>` : ''}</div></article>`, '<button class="btn" type="button" data-close-dialog>إغلاق</button>');
   }
 
-  function openItemEditor(kind, row) {
+  function openItemEditor(kind, row, options = {}) {
     const meta = collectionMeta[kind];
+    const patch = options?.patch && typeof options.patch === 'object' && !Array.isArray(options.patch) ? options.patch : {};
     const isNew = !row;
-    const item = row || { status: 'draft', is_active: true, sort_order: 0, rating: '', highlights: [], category: meta.categories[0]?.[0] || '', is_featured: false };
+    const item = { ...(row || { status: 'draft', is_active: true, sort_order: 0, rating: '', highlights: [], category: meta.categories[0]?.[0] || '', is_featured: false }), ...patch };
     const primary = meta.image ? `
       ${field('الفئة', 'category', item.category, { select: categoryOptions(kind, item.category) })}
       ${field('العنوان بالعربية', 'title_ar', item.title_ar)}
@@ -377,8 +396,9 @@
       ${field('ترتيب العرض', 'sort_order', item.sort_order, { type: 'number', step: '1', required: false })}
       ${checkField('الخدمة نشطة', 'is_active', item.is_active)}
     `;
-    const dialog = openDialog(`${isNew ? 'إضافة' : 'تعديل'} ${meta.singular}`, 'احفظ مسودة في أي وقت. عند النشر فقط سنطلب الحقول اللازمة لعرض المحتوى للزوار.', `<form id="item-editor" class="form-grid" novalidate><input type="hidden" name="slug" value="${escapeHtml(item.slug || '')}">${primary}<div class="full">${advancedSection(advanced)}</div></form>`, `<button type="button" class="btn" data-close-dialog>إلغاء</button><button type="button" class="btn" data-action="save-item" data-kind="${kind}" data-id="${item.id || ''}" data-mode="draft"><i class="fa-solid fa-floppy-disk"></i> حفظ مسودة</button><button type="button" class="btn btn-primary" data-action="save-item" data-kind="${kind}" data-id="${item.id || ''}" data-mode="published"><i class="fa-solid fa-paper-plane"></i> نشر</button>`);
+    const dialog = openDialog(`${isNew ? 'إضافة' : 'تعديل'} ${meta.singular}`, 'احفظ مسودة في أي وقت. عند النشر فقط سنطلب الحقول اللازمة لعرض المحتوى للزوار.', `<form id="item-editor" class="form-grid" novalidate>${copilotPrefillNotice(Object.keys(patch))}<input type="hidden" name="slug" value="${escapeHtml(item.slug || '')}">${primary}<div class="full">${advancedSection(advanced)}</div></form>`, `<button type="button" class="btn" data-close-dialog>إلغاء</button><button type="button" class="btn" data-action="save-item" data-kind="${kind}" data-id="${item.id || ''}" data-mode="draft"><i class="fa-solid fa-floppy-disk"></i> حفظ مسودة</button><button type="button" class="btn btn-primary" data-action="save-item" data-kind="${kind}" data-id="${item.id || ''}" data-mode="published"><i class="fa-solid fa-paper-plane"></i> نشر</button>`);
     dialog.dataset.kind = kind;
+    markCopilotPrefill(dialog, Object.keys(patch));
   }
 
   function itemPayloadFromForm(kind, form, mode) {
@@ -653,9 +673,13 @@
     </form>`;
   }
 
-  function openOfferEditor(item) {
+  function openOfferEditor(item, options = {}) {
+    const patch = options?.patch && typeof options.patch === 'object' && !Array.isArray(options.patch) ? options.patch : {};
+    const current = { ...(item || {}), ...patch };
     const isNew = !item;
-    openDialog(isNew ? 'إضافة صف سعر جديد' : 'تفاصيل عرض السعر', 'احفظه كمسودة للمراجعة أو انشره بعد التحقق. سيظهر للزائر فقط إذا كان منشورًا ومتوافرًا.', offerEditorBody(item), `<button class="btn" type="button" data-close-dialog>إلغاء</button><button class="btn" type="button" data-action="save-offer-editor" data-id="${item?.id || ''}" data-status="draft"><i class="fa-solid fa-floppy-disk"></i> حفظ كمسودة</button><button class="btn btn-primary" type="button" data-action="save-offer-editor" data-id="${item?.id || ''}" data-status="published"><i class="fa-solid fa-paper-plane"></i> نشر</button>`);
+    const body = `${copilotPrefillNotice(Object.keys(patch))}${offerEditorBody(current)}`;
+    const dialog = openDialog(isNew ? 'إضافة صف سعر جديد' : 'تفاصيل عرض السعر', 'احفظه كمسودة للمراجعة أو انشره بعد التحقق. سيظهر للزائر فقط إذا كان منشورًا ومتوافرًا.', body, `<button class="btn" type="button" data-close-dialog>إلغاء</button><button class="btn" type="button" data-action="save-offer-editor" data-id="${item?.id || ''}" data-status="draft"><i class="fa-solid fa-floppy-disk"></i> حفظ كمسودة</button><button class="btn btn-primary" type="button" data-action="save-offer-editor" data-id="${item?.id || ''}" data-status="published"><i class="fa-solid fa-paper-plane"></i> نشر</button>`);
+    markCopilotPrefill(dialog, Object.keys(patch));
   }
 
   async function saveOfferRow(button) {
@@ -833,8 +857,9 @@
     return `<div class="table-scroll"><table><thead><tr><th>المقال</th><th>التصنيف</th><th>الحالة</th><th>النشر / التحديث</th><th><span class="sr-only">إجراءات</span></th></tr></thead><tbody>${posts.map((post) => `<tr><td><div class="row-title">${post.featured_image_url ? `<img class="row-image" src="${escapeHtml(safeUrl(post.featured_image_url))}" alt="" onerror="this.style.visibility='hidden'">` : '<span class="row-image" aria-hidden="true"><i class="fa-solid fa-newspaper"></i></span>'}<span><strong>${escapeHtml(post.title_ar)}</strong><span>${escapeHtml(post.title_en)}</span></span></div></td><td>${escapeHtml(post.blog_categories?.title_ar || '—')}</td><td><div style="display:flex;gap:.35rem;flex-wrap:wrap">${blogStatusMarkup(post)}${post.is_featured ? '<span class="badge badge-featured"><i class="fa-solid fa-star"></i> مميز</span>' : ''}</div></td><td><span class="muted">${post.published_at ? `نشر: ${formatDate(post.published_at)}` : `تحديث: ${formatDate(post.updated_at)}`}</span></td><td><div class="table-actions"><button class="btn btn-small" data-action="preview-blog" data-id="${post.id}" aria-label="معاينة المقال"><i class="fa-regular fa-eye"></i></button><button class="btn btn-small" data-action="edit-blog" data-id="${post.id}" aria-label="تعديل المقال"><i class="fa-solid fa-pen"></i></button>${post.status !== 'published' ? `<button class="btn btn-small" data-action="publish-blog" data-id="${post.id}" aria-label="نشر المقال"><i class="fa-solid fa-upload"></i></button>` : `<button class="btn btn-small" data-action="archive-blog" data-id="${post.id}" aria-label="أرشفة المقال"><i class="fa-solid fa-box-archive"></i></button>`}<button class="btn btn-small btn-danger" data-action="delete-blog" data-id="${post.id}" aria-label="حذف المقال"><i class="fa-solid fa-trash"></i></button></div></td></tr>`).join('')}</tbody></table></div>`;
   }
 
-  function openBlogEditor(post) {
-    const current = post || { status: 'draft', is_featured: false, sort_order: 0, excerpt_ar: '', excerpt_en: '', content_ar: '', content_en: '', featured_image_url: '', featured_image_alt_ar: '', featured_image_alt_en: '', seo_title_ar: '', seo_title_en: '', seo_description_ar: '', seo_description_en: '' };
+  function openBlogEditor(post, options = {}) {
+    const patch = options?.patch && typeof options.patch === 'object' && !Array.isArray(options.patch) ? options.patch : {};
+    const current = { ...(post || { status: 'draft', is_featured: false, sort_order: 0, excerpt_ar: '', excerpt_en: '', content_ar: '', content_en: '', featured_image_url: '', featured_image_alt_ar: '', featured_image_alt_en: '', seo_title_ar: '', seo_title_en: '', seo_description_ar: '', seo_description_en: '' }), ...patch };
     const primary = `
       <div class="field"><label for="blog-category">التصنيف</label><select id="blog-category" name="category_id" class="select" required>${blogCategoryOptions(current.category_id)}</select></div>
       <div class="field"><label for="blog-title-ar">العنوان بالعربية</label><input id="blog-title-ar" name="title_ar" class="input" value="${escapeHtml(current.title_ar || '')}" required></div>
@@ -853,8 +878,9 @@
       ${englishField('وصف SEO بالإنجليزية', 'seo_description_en', current.seo_description_en, 'seo_description_ar', { textarea: true })}
       ${field('ترتيب الظهور', 'sort_order', Number(current.sort_order || 0), { type: 'number', required: false, step: '1' })}
       ${checkField('تعيين المقال كعنصر مميز عند النشر', 'is_featured', current.is_featured)}`;
-    const editor = `<form id="blog-editor" class="form-grid" novalidate><input type="hidden" name="slug" value="${escapeHtml(current.slug || '')}">${primary}<div class="full">${advancedSection(advanced)}</div></form>`;
-    openDialog(post ? 'تعديل المقال' : 'مقال جديد', 'احفظ مسودة في أي وقت. عند النشر فقط يلزم استكمال المحتوى الثنائي اللغة والصورة.', editor, `<button class="btn" type="button" data-close-dialog>إلغاء</button><button class="btn" type="button" data-action="save-blog" data-status="draft" data-id="${post?.id || ''}"><i class="fa-solid fa-floppy-disk"></i> حفظ مسودة</button><button class="btn btn-primary" type="button" data-action="save-blog" data-status="published" data-id="${post?.id || ''}"><i class="fa-solid fa-upload"></i> نشر</button>`);
+    const editor = `<form id="blog-editor" class="form-grid" novalidate>${copilotPrefillNotice(Object.keys(patch))}<input type="hidden" name="slug" value="${escapeHtml(current.slug || '')}">${primary}<div class="full">${advancedSection(advanced)}</div></form>`;
+    const dialog = openDialog(post ? 'تعديل المقال' : 'مقال جديد', 'احفظ مسودة في أي وقت. عند النشر فقط يلزم استكمال المحتوى الثنائي اللغة والصورة.', editor, `<button class="btn" type="button" data-close-dialog>إلغاء</button><button class="btn" type="button" data-action="save-blog" data-status="draft" data-id="${post?.id || ''}"><i class="fa-solid fa-floppy-disk"></i> حفظ مسودة</button><button class="btn btn-primary" type="button" data-action="save-blog" data-status="published" data-id="${post?.id || ''}"><i class="fa-solid fa-upload"></i> نشر</button>`);
+    markCopilotPrefill(dialog, Object.keys(patch));
   }
 
   function blogPayload(form, status, existing) {
@@ -1010,6 +1036,41 @@
     });
   }
 
+  function consumeCopilotEditorPrefill() {
+    let draft = null;
+    try {
+      const raw = sessionStorage.getItem(editorPrefillStorageKey);
+      if (!raw) return;
+      draft = JSON.parse(raw);
+    } catch { sessionStorage.removeItem(editorPrefillStorageKey); return; }
+    const entityToPage = { packages: 'packages', destinations: 'destinations', services: 'services', pricing_offers: 'pricing', blog_posts: 'blog' };
+    const expectedPage = entityToPage[draft?.entity];
+    if (!expectedPage || state.page !== expectedPage || !['create', 'update'].includes(draft?.operation) || !draft?.patch || typeof draft.patch !== 'object' || Array.isArray(draft.patch)) return;
+    sessionStorage.removeItem(editorPrefillStorageKey);
+    const allowedFields = {
+      packages: ['category', 'title_ar', 'title_en', 'description_ar', 'description_en', 'image_url', 'image_alt_ar', 'image_alt_en', 'badge_ar', 'badge_en', 'rating', 'highlights', 'price_label_ar', 'price_label_en', 'sort_order', 'is_active', 'is_featured', 'status'],
+      destinations: ['category', 'title_ar', 'title_en', 'description_ar', 'description_en', 'image_url', 'image_alt_ar', 'image_alt_en', 'badge_ar', 'badge_en', 'rating', 'highlights', 'price_label_ar', 'price_label_en', 'sort_order', 'is_active', 'is_featured', 'status'],
+      services: ['title_ar', 'title_en', 'description_ar', 'description_en', 'icon_class', 'sort_order', 'is_active', 'status'],
+      pricing_offers: ['package_id', 'service_id', 'destination_id', 'departure_month', 'min_travelers', 'max_travelers', 'price_amount', 'availability', 'price_mode', 'pricing_unit', 'currency', 'notes_ar', 'notes_en', 'sort_order', 'status'],
+      blog_posts: ['category_id', 'title_ar', 'title_en', 'excerpt_ar', 'excerpt_en', 'content_ar', 'content_en', 'featured_image_url', 'featured_image_alt_ar', 'featured_image_alt_en', 'seo_title_ar', 'seo_title_en', 'seo_description_ar', 'seo_description_en', 'sort_order', 'is_featured', 'status']
+    };
+    const patch = Object.fromEntries(Object.entries(draft.patch).filter(([key]) => allowedFields[draft.entity].includes(key)));
+    if (!Object.keys(patch).length) { showToast('error', 'مسودة غير صالحة', 'لم تحتوِ مسودة المساعد على حقول قابلة للمراجعة.'); return; }
+    let record = null;
+    if (draft.operation === 'update') {
+      const recordId = String(draft.targetId || '');
+      if (!recordId) { showToast('error', 'تعذر فتح التعديل', 'لا توجد هوية متحققة للسجل المطلوب.'); return; }
+      if (collectionMeta[draft.entity]) record = (state.collections[draft.entity] || []).find((item) => item.id === recordId);
+      if (draft.entity === 'pricing_offers') record = (state.pricing?.offers || []).find((item) => item.id === recordId);
+      if (draft.entity === 'blog_posts') record = (state.blog?.posts || []).find((item) => item.id === recordId);
+      if (!record) { showToast('error', 'تعذر فتح التعديل', 'لم يعد السجل المتحقق منه متاحًا في البيانات الحالية.'); return; }
+    }
+    if (collectionMeta[draft.entity]) openItemEditor(draft.entity, record, { patch });
+    else if (draft.entity === 'pricing_offers') openOfferEditor(record, { patch });
+    else if (draft.entity === 'blog_posts') openBlogEditor(record, { patch });
+    showToast('success', 'مسودة المساعد جاهزة', 'راجع الحقول المميزة ثم احفظ المسودة أو انشر بنفسك.');
+  }
+
   async function renderPage() {
     closeMobileNav();
     state.page = currentPage();
@@ -1024,6 +1085,7 @@
     else await renderDashboard();
     syncMobileNavState(false);
     applyTableAffordances();
+    consumeCopilotEditorPrefill();
   }
 
   function closeMobileNav({ restoreFocus = false } = {}) {

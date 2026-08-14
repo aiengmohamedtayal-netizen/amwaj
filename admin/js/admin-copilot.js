@@ -3,9 +3,10 @@
 
   const API_PATH = '/api/admin-copilot';
   const storageKey = 'amwaj_admin_copilot_open';
+  const editorPrefillStorageKey = 'amwaj_admin_copilot_editor_prefill';
   const MAX_DOCUMENT_BYTES = 5 * 1024 * 1024;
   const MAX_DOCUMENT_TEXT = 24000;
-  const state = { open: false, busy: false, language: 'ar', history: [], pendingMutation: null, attachments: [], documentAttachment: null };
+  const state = { open: false, busy: false, language: 'ar', history: [], pendingMutation: null, attachments: [], documentAttachment: null, editorPrefills: new Map(), prefillSequence: 0 };
 
   const routes = Object.freeze({
     '/admin/': 'لوحة التحكم',
@@ -159,9 +160,36 @@
       });
       if (nav.childElementCount) article.querySelector('.copilot-message-body').append(nav);
     }
+    if (role === 'assistant' && extra.editorPrefill) appendEditorPrefillCard(extra.editorPrefill, article.querySelector('.copilot-message-body'));
     if (role === 'assistant' && extra.proposedMutation) appendMutationCard(extra.proposedMutation, article.querySelector('.copilot-message-body'));
     if (role === 'assistant' && extra.execution) appendExecutionStatus(extra.execution, article.querySelector('.copilot-message-body'));
     scrollToLatest();
+  }
+
+  function appendEditorPrefillCard(prefill, parent) {
+    const routeByEntity = { destinations: '/admin/destinations/', packages: '/admin/packages/', services: '/admin/services/', pricing_offers: '/admin/pricing/', blog_posts: '/admin/blog/' };
+    const route = routeByEntity[prefill?.entity];
+    if (!route || !['create', 'update'].includes(prefill?.operation)) return;
+    const id = `draft-${Date.now()}-${++state.prefillSequence}`;
+    state.editorPrefills.set(id, prefill);
+    const card = document.createElement('section');
+    card.className = 'copilot-prefill-card';
+    const title = prefill.operation === 'create' ? `مسودة ${actionName(prefill)}` : `تعديل مقترح: ${actionName(prefill)}`;
+    const message = prefill.operation === 'create'
+      ? 'سيفتح المحرر بالحقول المقترحة. راجعها ثم احفظ مسودة أو انشر بنفسك.'
+      : 'سيفتح السجل المتحقق منه مع تمييز الحقول المقترحة. لن يُحفظ أي تغيير تلقائيًا.';
+    card.innerHTML = `<div class="copilot-prefill-card-title"><i class="fa-solid fa-pen-to-square" aria-hidden="true"></i><strong>${escapeHtml(title)}</strong></div><p>${escapeHtml(mutationSummary(prefill))}</p><p class="copilot-prefill-card-note">${escapeHtml(message)}</p><div class="copilot-mutation-actions"><button type="button" class="btn btn-primary" data-copilot="open-editor-prefill" data-prefill-id="${id}"><i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i> فتح في المحرر للمراجعة</button></div>`;
+    parent.append(card);
+  }
+
+  function openEditorPrefill(prefillId) {
+    const prefill = state.editorPrefills.get(prefillId);
+    const routeByEntity = { destinations: '/admin/destinations/', packages: '/admin/packages/', services: '/admin/services/', pricing_offers: '/admin/pricing/', blog_posts: '/admin/blog/' };
+    const route = routeByEntity[prefill?.entity];
+    if (!prefill || !route) return;
+    try { sessionStorage.setItem(editorPrefillStorageKey, JSON.stringify(prefill)); } catch { appendMessage('assistant', 'تعذر تجهيز المسودة في المتصفح. أعد المحاولة.'); return; }
+    setOpen(false, { focus: false });
+    window.location.assign(route);
   }
 
   function appendExecutionStatus(result, parent) {
@@ -436,6 +464,7 @@
         event.target.closest('button').setAttribute('aria-label', state.language === 'ar' ? 'التبديل إلى الإنجليزية' : 'Switch to Arabic');
       }
       if (command === 'confirm-mutation') executePendingMutation();
+      if (command === 'open-editor-prefill') openEditorPrefill(event.target.closest('[data-prefill-id]')?.dataset.prefillId || '');
       if (command === 'upload-image') fileInput()?.click();
       if (command === 'upload-document') documentInput()?.click();
       if (command === 'remove-attachment') {
