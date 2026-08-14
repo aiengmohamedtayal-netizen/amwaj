@@ -17,7 +17,7 @@ const select = (value) => ({ type: 'select', select: { name: value } });
 
 const authUserId = 'd06cf275-42b8-4ad4-8a64-260e524569d3';
 const directAuthUserId = 'e85fba58-d8a2-429b-ae53-4ba8c937d273';
-const directPassword = 'DirectLogin!2026';
+const directPassword = 'Direct!8';
 
 const resetPage = {
   parent: { data_source_id: process.env.NOTION_ADMIN_DATA_SOURCE_ID },

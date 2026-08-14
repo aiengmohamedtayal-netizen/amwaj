@@ -618,7 +618,7 @@ async function createAdminWithPassword(config, page) {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw error('Email is invalid.');
   if (!fullName) throw error('Name is required.');
   if (!password) throw error('Password is required.');
-  if (password.length < 12) throw error('Password must be at least 12 characters.');
+  if (password.length < 8) throw error('Password must be at least 8 characters.');
 
   // The password is sent only to Supabase Auth over TLS. It is never returned,
   // persisted in an application table, logged, or written back to Notion.
@@ -983,7 +983,7 @@ function arabicResultMessage(message) {
     'Name is required.': 'الاسم مطلوب.',
     'Email is invalid.': 'البريد الإلكتروني غير صحيح.',
     'Password is required.': 'كلمة المرور مطلوبة.',
-    'Password must be at least 12 characters.': 'كلمة المرور يجب ألا تقل عن 12 حرفًا.',
+    'Password must be at least 8 characters.': 'كلمة المرور يجب ألا تقل عن 8 أحرف.',
     'Slug may contain lowercase letters, numbers, and hyphens only.': 'الرابط المختصر يقبل حروفًا إنجليزية صغيرة وأرقامًا وشرطات فقط.',
     'Sort Order cannot be negative.': 'ترتيب العرض لا يمكن أن يكون رقمًا سالبًا.',
     'Rating must be between 0 and 5.': 'التقييم يجب أن يكون بين 0 و5.',
