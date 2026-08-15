@@ -49,6 +49,14 @@
       categories: [], image: false, featured: false
     }
   };
+  // Central policy: only content/business fields may opt into a custom value.
+  // Package and destination categories remain fixed until the approved reference-table migration is applied.
+  const customValuePolicy = Object.freeze({
+    packages: Object.freeze({ category: Object.freeze({ allowCustom: false, hint: 'القيم المدعومة حاليًا: VIP، عائلي، شهر عسل. دعم القيمة المخصصة مؤجل إلى Migration معتمدة.' }) }),
+    destinations: Object.freeze({ category: Object.freeze({ allowCustom: false, hint: 'القيم المدعومة حاليًا: داخل مصر، دولية، عمرة. دعم القيمة المخصصة مؤجل إلى Migration معتمدة.' }) }),
+    services: Object.freeze({ icon_class: Object.freeze({ allowCustom: true, customLabel: 'مثال: fa-camera' }) }),
+    pricing_offers: Object.freeze({ trip_style: Object.freeze({ allowCustom: false, hint: 'اختر نوعًا من القيم المدعومة. خيار «مخصصة» قيمة نظامية وليس حقل نص حر.' }) })
+  });
   const state = { auth: null, page: 'dashboard', collections: {}, search: '' };
   const editorPrefillStorageKey = 'amwaj_admin_copilot_editor_prefill';
   const draftFallbacks = {
@@ -249,11 +257,13 @@
   function customOptionList(items, selected, allowCustom = true) {
     const current = String(selected ?? '');
     const known = items.some(([value]) => value === current);
-    const selectedValue = known ? current : (allowCustom ? CUSTOM_SELECT_VALUE : (items[0]?.[0] || ''));
+    const selectedValue = known ? current : (allowCustom ? CUSTOM_SELECT_VALUE : current || (items[0]?.[0] || ''));
+    const currentOption = !known && current && !allowCustom
+      ? `<option value="${escapeHtml(current)}" selected>القيمة الحالية المحفوظة: ${escapeHtml(current)}</option>`
+      : '';
     const options = items.map(([value, label]) => `<option value="${escapeHtml(value)}" ${selectedValue === value ? 'selected' : ''}>${escapeHtml(label)}</option>`).join('');
-    if (!allowCustom) return options;
-    const currentOption = !known && current ? `<option value="${CUSTOM_SELECT_VALUE}" selected>أخرى (القيمة الحالية)</option>` : '';
-    const otherOption = !known && current ? currentOption : `<option value="${CUSTOM_SELECT_VALUE}" ${selectedValue === CUSTOM_SELECT_VALUE ? 'selected' : ''}>أخرى</option>`;
+    if (!allowCustom) return `${currentOption}${options}`;
+    const otherOption = !known && current ? `<option value="${CUSTOM_SELECT_VALUE}" selected>أخرى (القيمة الحالية)</option>` : `<option value="${CUSTOM_SELECT_VALUE}" ${selectedValue === CUSTOM_SELECT_VALUE ? 'selected' : ''}>أخرى</option>`;
     return `${options}${otherOption}`;
   }
 
@@ -266,7 +276,8 @@
     const className = options.full ? 'field full custom-select-field' : 'field custom-select-field';
     const required = options.required === false ? '' : 'required';
     const customLabel = options.customLabel || `اكتب ${label}`;
-    const customInput = allowCustom ? `<input class="input custom-option-input" name="${name}_custom" data-custom-select-value-for="${name}" type="text" value="${escapeHtml(customValue)}" placeholder="${escapeHtml(customLabel)}" ${isOther ? '' : 'hidden'}><span class="field-hint">اختر قيمة جاهزة أو «أخرى» لكتابة قيمة من عندك.</span>` : '<span class="field-hint">الفئات المدعومة: VIP، عائلي، شهر عسل.</span>';
+    const hint = options.hint || (allowCustom ? 'اختر قيمة جاهزة أو «أخرى» لكتابة قيمة من عندك.' : 'القائمة تعرض القيم النظامية المدعومة حاليًا.');
+    const customInput = allowCustom ? `<input class="input custom-option-input" name="${name}_custom" data-custom-select-value-for="${name}" type="text" value="${escapeHtml(customValue)}" placeholder="${escapeHtml(customLabel)}" ${isOther ? '' : 'hidden'}><span class="field-hint">${escapeHtml(hint)}</span>` : `<span class="field-hint">${escapeHtml(hint)}</span>`;
     return `<div class="${className}" data-custom-select><label for="field-${name}">${label}</label><select class="select" id="field-${name}" name="${name}" data-custom-select-choice ${required}>${customOptionList(items, current, allowCustom)}</select>${customInput}</div>`;
   }
 
@@ -282,11 +293,14 @@
     return String(form.querySelector(`[name="${name}_custom"]`)?.value || '').trim();
   }
 
-  function customOfferSelectField(label, name, items, selected, customLabel, compact = false) {
+  function customOfferSelectField(label, name, items, selected, customLabel, compact = false, options = {}) {
+    const allowCustom = options.allowCustom !== false;
     const current = String(selected ?? '');
     const known = items.some(([value]) => value === current);
     const id = compact ? '' : ` id="field-${name}"`;
-    return `<div class="${compact ? 'custom-select-compact' : 'custom-select-field'}" data-custom-select><label${compact ? ' class="sr-only"' : ` for="field-${name}"`}>${label}</label><select class="select${compact ? ' sheet-select' : ''}"${id} name="${name}" data-offer-field="${name}" data-custom-select-choice required>${customOptionList(items, current)}</select><input class="input${compact ? ' sheet-input' : ''} custom-option-input" name="${name}_custom" data-offer-field="${name}_custom" data-custom-select-value-for="${name}" type="text" value="${escapeHtml(known ? '' : current)}" placeholder="${escapeHtml(customLabel)}" ${known ? 'hidden' : ''}><span class="field-hint"${compact ? ' hidden' : ''}>اختر قيمة جاهزة أو «أخرى» لكتابة قيمة من عندك.</span></div>`;
+    const hint = options.hint || 'اختر قيمة جاهزة أو «أخرى» لكتابة قيمة من عندك.';
+    const input = allowCustom ? `<input class="input${compact ? ' sheet-input' : ''} custom-option-input" name="${name}_custom" data-offer-field="${name}_custom" data-custom-select-value-for="${name}" type="text" value="${escapeHtml(known ? '' : current)}" placeholder="${escapeHtml(customLabel)}" ${known ? 'hidden' : ''}>` : '';
+    return `<div class="${compact ? 'custom-select-compact' : 'custom-select-field'}" data-custom-select><label${compact ? ' class="sr-only"' : ` for="field-${name}"`}>${label}</label><select class="select${compact ? ' sheet-select' : ''}"${id} name="${name}" data-offer-field="${name}" data-custom-select-choice required>${customOptionList(items, current, allowCustom)}</select>${input}<span class="field-hint"${compact ? ' hidden' : ''}>${escapeHtml(hint)}</span></div>`;
   }
 
   function validateCustomSelections(container) {
@@ -294,6 +308,23 @@
       if (select.value !== CUSTOM_SELECT_VALUE) return;
       const custom = container.querySelector(`[data-custom-select-value-for="${select.name}"]`);
       if (!String(custom?.value || '').trim()) throw new Error(`اكتب القيمة المخصصة في حقل «${select.name}» بعد اختيار «أخرى».`);
+    });
+  }
+
+  function validateFixedBusinessValues(kind, container) {
+    const rules = customValuePolicy[kind] || {};
+    Object.entries(rules).forEach(([name, rule]) => {
+      if (rule.allowCustom !== false) return;
+      const select = container.querySelector(`[name="${name}"], [data-offer-field="${name}"]`);
+      if (!select) return;
+      const value = String(select.value || '').trim();
+      const items = kind === 'pricing_offers' ? offerStyles : collectionMeta[kind]?.categories || [];
+      if (value && value !== CUSTOM_SELECT_VALUE && !items.some(([optionValue]) => optionValue === value)) {
+        throw new Error(`لا يمكن حفظ القيمة المخصصة «${value}» في هذا الحقل الآن. ${rule.hint || 'يلزم اعتماد دعم قاعدة البيانات أولاً.'}`);
+      }
+      if (value === CUSTOM_SELECT_VALUE) {
+        throw new Error(`هذا الحقل مضبوط على قيم نظامية فقط. ${rule.hint || ''}`.trim());
+      }
     });
   }
 
@@ -356,10 +387,12 @@
     syncDynamicItemEditor(dialog);
   }
 
-  function copilotPrefillNotice(fields) {
+  function copilotPrefillNotice(fields, customLabels = {}) {
     const count = Array.isArray(fields) ? fields.length : 0;
-    if (!count) return '';
-    return `<div class="copilot-prefill-notice full" role="status"><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i><div><strong>مسودة مقترحة من مساعد الإدارة</strong><span>تمت تعبئة ${count} ${count === 1 ? 'حقل' : 'حقول'} للمراجعة فقط. لن يُحفظ أو يُنشر أي شيء قبل اختيارك أحد أزرار الحفظ.</span></div></div>`;
+    const labels = Object.entries(customLabels || {}).filter(([field, value]) => field && String(value || '').trim());
+    if (!count && !labels.length) return '';
+    const customNote = labels.length ? `<span>قيم مخصصة مقترحة للمراجعة: ${labels.map(([, value]) => `«${escapeHtml(value)}»`).join('، ')}. لن تُحفظ تلقائيًا، وقد يتطلب حفظها اعتماد دعم قاعدة البيانات أولًا.</span>` : '';
+    return `<div class="copilot-prefill-notice full" role="status"><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i><div><strong>مسودة مقترحة من مساعد الإدارة</strong><span>تمت تعبئة ${count} ${count === 1 ? 'حقل' : 'حقول'} للمراجعة فقط. لن يُحفظ أو يُنشر أي شيء قبل اختيارك أحد أزرار الحفظ.</span>${customNote}</div></div>`;
   }
 
   function markCopilotPrefill(dialog, fields) {
@@ -543,7 +576,7 @@
     const isNew = !row;
     const item = { ...(row || { status: 'draft', is_active: true, sort_order: 0, rating: '', highlights: [], category: meta.categories[0]?.[0] || '', is_featured: false }), ...patch };
     const primary = meta.image ? `
-      ${customSelectField('الفئة', 'category', meta.categories, item.category, { customLabel: 'اكتب فئة مخصصة', allowCustom: kind !== 'packages' })}
+      ${customSelectField('الفئة', 'category', meta.categories, item.category, { ...(customValuePolicy[kind]?.category || {}), full: false })}
       ${field('العنوان بالعربية', 'title_ar', item.title_ar)}
       ${field('الوصف بالعربية', 'description_ar', item.description_ar, { textarea: true, full: true })}
       ${imageUploadField('image_file', 'image_url', editorValue(item.image_url, draftFallbacks.imageUrl), kind, 'صورة البطاقة')}
@@ -574,7 +607,7 @@
       ${field('ترتيب العرض', 'sort_order', item.sort_order, { type: 'number', step: '1', required: false })}
       ${checkField('الخدمة نشطة', 'is_active', item.is_active)}
     `;
-    const dialog = openDialog(`${isNew ? 'إضافة' : 'تعديل'} ${meta.singular}`, 'احفظ مسودة في أي وقت. عند النشر فقط سنطلب الحقول اللازمة لعرض المحتوى للزوار.', `<form id="item-editor" class="form-grid" novalidate>${copilotPrefillNotice(Object.keys(patch))}<input type="hidden" name="slug" value="${escapeHtml(item.slug || '')}">${primary}<div class="full">${advancedSection(advanced)}</div></form>`, `<button type="button" class="btn" data-close-dialog>إلغاء</button><button type="button" class="btn" data-action="save-item" data-kind="${kind}" data-id="${item.id || ''}" data-mode="draft"><i class="fa-solid fa-floppy-disk"></i> حفظ مسودة</button><button type="button" class="btn btn-primary" data-action="save-item" data-kind="${kind}" data-id="${item.id || ''}" data-mode="published"><i class="fa-solid fa-paper-plane"></i> نشر</button>`);
+    const dialog = openDialog(`${isNew ? 'إضافة' : 'تعديل'} ${meta.singular}`, 'احفظ مسودة في أي وقت. عند النشر فقط سنطلب الحقول اللازمة لعرض المحتوى للزوار.', `<form id="item-editor" class="form-grid" novalidate>${copilotPrefillNotice(Object.keys(patch), options.customLabels)}<input type="hidden" name="slug" value="${escapeHtml(item.slug || '')}">${primary}<div class="full">${advancedSection(advanced)}</div></form>`, `<button type="button" class="btn" data-close-dialog>إلغاء</button><button type="button" class="btn" data-action="save-item" data-kind="${kind}" data-id="${item.id || ''}" data-mode="draft"><i class="fa-solid fa-floppy-disk"></i> حفظ مسودة</button><button type="button" class="btn btn-primary" data-action="save-item" data-kind="${kind}" data-id="${item.id || ''}" data-mode="published"><i class="fa-solid fa-paper-plane"></i> نشر</button>`);
     dialog.dataset.kind = kind;
     markCopilotPrefill(dialog, Object.keys(patch));
     bindDynamicItemEditor(dialog);
@@ -620,9 +653,12 @@
   async function saveItem(button) {
     const dialog = button.closest('dialog');
     const form = dialog.querySelector('#item-editor');
-    if (!form.reportValidity()) return;
-    try { validateCustomSelections(form); } catch (error) { showToast('error', 'القيمة المخصصة ناقصة', error.message); return; }
     const kind = button.dataset.kind;
+    if (!form.reportValidity()) return;
+    try {
+      validateCustomSelections(form);
+      validateFixedBusinessValues(kind, form);
+    } catch (error) { showToast('error', 'القيمة غير مدعومة حاليًا', error.message); return; }
     const meta = collectionMeta[kind];
     const mode = button.dataset.mode;
     setButtonBusy(button, true);
@@ -737,7 +773,7 @@
       return `<tr data-offer-id="${item.id}">
         <td><select class="select sheet-select" data-offer-field="subject">${offerSubjectOptions(item)}</select><small class="muted">${escapeHtml(subject.title_en || '')}</small></td>
         <td><select class="select sheet-select" data-offer-field="destination_id">${offerDestinationOptions(item.destination_id)}</select><small class="muted">${escapeHtml(destination.title_ar)}</small></td>
-        <td>${customOfferSelectField('نوع الرحلة', 'trip_style', offerStyles, item.trip_style, 'اكتب نوع رحلة مخصصًا', true)}</td>
+        <td>      ${customOfferSelectField('نوع الرحلة', 'trip_style', offerStyles, item.trip_style, 'اكتب نوع رحلة مخصصًا', true, customValuePolicy.pricing_offers.trip_style)}</td>
         <td><input class="input sheet-input" data-offer-field="departure_month" type="month" value="${escapeHtml(departureMonth(item.departure_month))}" aria-label="شهر السفر"></td>
         <td><div style="display:flex;gap:.4rem"><input class="input sheet-input" data-offer-field="min_travelers" type="number" min="1" value="${item.min_travelers}" aria-label="الحد الأدنى للمسافرين"><input class="input sheet-input" data-offer-field="max_travelers" type="number" min="1" value="${item.max_travelers}" aria-label="الحد الأقصى للمسافرين"></div></td>
         <td><select class="select sheet-select" data-offer-field="price_mode">${optionList(offerModes, item.price_mode)}</select></td>
@@ -792,6 +828,7 @@
 
   function offerPayload(container, statusOverride) {
     validateCustomSelections(container);
+    validateFixedBusinessValues('pricing_offers', container);
     const subject = offerValue(container, 'subject');
     const [subjectType, subjectId] = subject.split(':');
     const departure = offerValue(container, 'departure_month');
@@ -837,7 +874,7 @@
   function offerEditorBody(item) {
     const offer = item || { package_id: '', service_id: '', destination_id: '', trip_style: 'custom', departure_month: '', min_travelers: 1, max_travelers: 4, price_mode: 'fixed', price_amount: '', discounted_price_amount: '', availability: 'available', seats_available: '', status: 'draft', sort_order: 0, notes_ar: '', notes_en: '' };
     const advanced = `
-      ${customOfferSelectField('نوع الرحلة', 'trip_style', offerStyles, offer.trip_style, 'اكتب نوع رحلة مخصصًا')}
+      ${customOfferSelectField('نوع الرحلة', 'trip_style', offerStyles, offer.trip_style, 'اكتب نوع رحلة مخصصًا', false, customValuePolicy.pricing_offers.trip_style)}
       <div class="field"><label for="field-price_mode">طريقة السعر</label><select id="field-price_mode" class="select" data-offer-field="price_mode">${optionList(offerModes, offer.price_mode)}</select><span class="field-hint">اترك السعر فارغًا في المسودة ليصبح «طلب عرض سعر».</span></div>
       <div class="field"><label for="field-discounted_price_amount">سعر الخصم للفرد (ج.م.)</label><input id="field-discounted_price_amount" class="input" data-offer-field="discounted_price_amount" type="number" min="0" step="0.01" value="${offer.discounted_price_amount ?? ''}"></div>
       <div class="field"><label for="field-seats_available">المقاعد المتاحة</label><input id="field-seats_available" class="input" data-offer-field="seats_available" type="number" min="0" value="${offer.seats_available ?? ''}"></div>
@@ -860,7 +897,7 @@
     const patch = options?.patch && typeof options.patch === 'object' && !Array.isArray(options.patch) ? options.patch : {};
     const current = { ...(item || {}), ...patch };
     const isNew = !item;
-    const body = `${copilotPrefillNotice(Object.keys(patch))}${offerEditorBody(current)}`;
+    const body = `${copilotPrefillNotice(Object.keys(patch), options.customLabels)}${offerEditorBody(current)}`;
     const dialog = openDialog(isNew ? 'إضافة صف سعر جديد' : 'تفاصيل عرض السعر', 'احفظه كمسودة للمراجعة أو انشره بعد التحقق. سيظهر للزائر فقط إذا كان منشورًا ومتوافرًا.', body, `<button class="btn" type="button" data-close-dialog>إلغاء</button><button class="btn" type="button" data-action="save-offer-editor" data-id="${item?.id || ''}" data-status="draft"><i class="fa-solid fa-floppy-disk"></i> حفظ كمسودة</button><button class="btn btn-primary" type="button" data-action="save-offer-editor" data-id="${item?.id || ''}" data-status="published"><i class="fa-solid fa-paper-plane"></i> نشر</button>`);
     markCopilotPrefill(dialog, Object.keys(patch));
   }
@@ -1338,8 +1375,9 @@
       if (draft.entity === 'blog_posts') record = (state.blog?.posts || []).find((item) => item.id === recordId);
       if (!record) { showToast('error', 'تعذر فتح التعديل', 'لم يعد السجل المتحقق منه متاحًا في البيانات الحالية.'); return; }
     }
-    if (collectionMeta[draft.entity]) openItemEditor(draft.entity, record, { patch });
-    else if (draft.entity === 'pricing_offers') openOfferEditor(record, { patch });
+    const customLabels = draft.customLabels && typeof draft.customLabels === 'object' && !Array.isArray(draft.customLabels) ? draft.customLabels : {};
+    if (collectionMeta[draft.entity]) openItemEditor(draft.entity, record, { patch, customLabels });
+    else if (draft.entity === 'pricing_offers') openOfferEditor(record, { patch, customLabels });
     else if (draft.entity === 'blog_posts') openBlogEditor(record, { patch });
     showToast('success', 'مسودة المساعد جاهزة', 'راجع الحقول المميزة ثم احفظ المسودة أو انشر بنفسك.');
   }
