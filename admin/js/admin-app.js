@@ -14,6 +14,27 @@
     reviews: { title: 'آراء العملاء', subtitle: 'راجع آراء الزوار واعتمد الموثوق منها قبل ظهورها في الموقع العام.' },
     settings: { title: 'إعدادات الموقع', subtitle: 'مراجعة وتحديث الإعدادات المسجلة في مصدر البيانات المركزي.' }
   };
+  const serviceIconOptions = [
+    ['fa-concierge-bell', 'خدمات سياحية عامة'],
+    ['fa-plane', 'طيران ورحلات جوية'],
+    ['fa-hotel', 'فنادق وإقامة'],
+    ['fa-passport', 'تأشيرات وجوازات'],
+    ['fa-ticket', 'تذاكر وحجوزات'],
+    ['fa-car', 'انتقالات وسيارات'],
+    ['fa-bus', 'حافلات ونقل جماعي'],
+    ['fa-ship', 'رحلات بحرية'],
+    ['fa-train', 'رحلات قطار'],
+    ['fa-kaaba', 'حج وعمرة'],
+    ['fa-umbrella-beach', 'شاطئ وعطلات'],
+    ['fa-map-location-dot', 'وجهات وإرشاد سياحي'],
+    ['fa-suitcase-rolling', 'برامج سياحية'],
+    ['fa-calendar-days', 'تنظيم وجدولة الرحلات'],
+    ['fa-headset', 'دعم وخدمة عملاء'],
+    ['fa-star', 'خدمة مميزة'],
+    ['fa-shield-halved', 'حماية وتأمين'],
+    ['fa-earth-americas', 'سياحة دولية']
+  ];
+
   const collectionMeta = {
     packages: {
       table: 'packages', singular: 'برنامج', plural: 'البرامج', icon: 'fa-suitcase-rolling',
@@ -223,6 +244,18 @@
     return collectionMeta[kind].categories.map(([value, label]) => `<option value="${value}" ${selected === value ? 'selected' : ''}>${label}</option>`).join('');
   }
 
+  function serviceIconOptionsMarkup(selected) {
+    const current = String(selected || 'fa-star');
+    const known = serviceIconOptions.some(([value]) => value === current);
+    const currentOption = known ? '' : `<option value="${escapeHtml(current)}" selected>الأيقونة الحالية (${escapeHtml(current)})</option>`;
+    return currentOption + serviceIconOptions.map(([value, label]) => `<option value="${value}" ${current === value ? 'selected' : ''}>${label}</option>`).join('');
+  }
+
+  function serviceIconField(selected) {
+    const current = String(selected || 'fa-star');
+    return `<div class="field icon-picker-field"><label for="field-icon_class">الأيقونة المستخدمة للخدمة</label><div class="icon-picker"><select class="select" id="field-icon_class" name="icon_class" required>${serviceIconOptionsMarkup(current)}</select><span class="icon-picker-preview" data-icon-preview aria-hidden="true"><i class="fa-solid ${escapeHtml(current)}"></i></span></div><span class="field-hint">اختر أيقونة جاهزة؛ ستظهر المعاينة بجوار القائمة، ويمكنك تغييرها قبل الحفظ.</span></div>`;
+  }
+
   function field(label, name, value, options) {
     const settings = options || {};
     const className = settings.full ? 'field full' : 'field';
@@ -427,6 +460,10 @@
     dialog.addEventListener('change', (event) => {
       if (event.target.closest('form')) setDirty();
       if (event.target.matches('input[type="file"]')) updateLocalPreview(event.target);
+      if (event.target.matches('select[name="icon_class"]')) {
+        const preview = event.target.closest('.icon-picker')?.querySelector('[data-icon-preview] i');
+        if (preview) preview.className = `fa-solid ${event.target.value || 'fa-star'}`;
+      }
     });
     dialog.addEventListener('close', () => {
       dialog.querySelectorAll('.media-upload-preview[data-object-url]').forEach((image) => URL.revokeObjectURL(image.dataset.objectUrl));
@@ -459,7 +496,7 @@
     ` : `
       ${field('العنوان بالعربية', 'title_ar', item.title_ar)}
       ${field('الوصف بالعربية', 'description_ar', item.description_ar, { textarea: true, full: true })}
-      ${field('فئة الأيقونة', 'icon_class', item.icon_class || 'fa-star', { hint: 'مثال: fa-plane أو fa-hotel.' })}
+      ${serviceIconField(item.icon_class || 'fa-star')}
     `;
     const advanced = meta.image ? `
       ${englishField('العنوان بالإنجليزية', 'title_en', item.title_en, 'title_ar')}
