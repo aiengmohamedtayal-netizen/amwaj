@@ -246,24 +246,28 @@
     return collectionMeta[kind].categories.map(([value, label]) => `<option value="${value}" ${selected === value ? 'selected' : ''}>${label}</option>`).join('');
   }
 
-  function customOptionList(items, selected) {
+  function customOptionList(items, selected, allowCustom = true) {
     const current = String(selected ?? '');
     const known = items.some(([value]) => value === current);
-    const selectedValue = known ? current : CUSTOM_SELECT_VALUE;
+    const selectedValue = known ? current : (allowCustom ? CUSTOM_SELECT_VALUE : (items[0]?.[0] || ''));
+    const options = items.map(([value, label]) => `<option value="${escapeHtml(value)}" ${selectedValue === value ? 'selected' : ''}>${escapeHtml(label)}</option>`).join('');
+    if (!allowCustom) return options;
     const currentOption = !known && current ? `<option value="${CUSTOM_SELECT_VALUE}" selected>أخرى (القيمة الحالية)</option>` : '';
     const otherOption = !known && current ? currentOption : `<option value="${CUSTOM_SELECT_VALUE}" ${selectedValue === CUSTOM_SELECT_VALUE ? 'selected' : ''}>أخرى</option>`;
-    return `${items.map(([value, label]) => `<option value="${escapeHtml(value)}" ${selectedValue === value ? 'selected' : ''}>${escapeHtml(label)}</option>`).join('')}${otherOption}`;
+    return `${options}${otherOption}`;
   }
 
   function customSelectField(label, name, items, selected, options = {}) {
+    const allowCustom = options.allowCustom !== false;
     const current = String(selected ?? '');
     const known = items.some(([value]) => value === current);
-    const isOther = !known;
+    const isOther = allowCustom && !known;
     const customValue = isOther ? current : '';
     const className = options.full ? 'field full custom-select-field' : 'field custom-select-field';
     const required = options.required === false ? '' : 'required';
     const customLabel = options.customLabel || `اكتب ${label}`;
-    return `<div class="${className}" data-custom-select><label for="field-${name}">${label}</label><select class="select" id="field-${name}" name="${name}" data-custom-select-choice ${required}>${customOptionList(items, current)}</select><input class="input custom-option-input" name="${name}_custom" data-custom-select-value-for="${name}" type="text" value="${escapeHtml(customValue)}" placeholder="${escapeHtml(customLabel)}" ${isOther ? '' : 'hidden'}><span class="field-hint">اختر قيمة جاهزة أو «أخرى» لكتابة قيمة من عندك.</span></div>`;
+    const customInput = allowCustom ? `<input class="input custom-option-input" name="${name}_custom" data-custom-select-value-for="${name}" type="text" value="${escapeHtml(customValue)}" placeholder="${escapeHtml(customLabel)}" ${isOther ? '' : 'hidden'}><span class="field-hint">اختر قيمة جاهزة أو «أخرى» لكتابة قيمة من عندك.</span>` : '<span class="field-hint">الفئات المدعومة: VIP، عائلي، شهر عسل.</span>';
+    return `<div class="${className}" data-custom-select><label for="field-${name}">${label}</label><select class="select" id="field-${name}" name="${name}" data-custom-select-choice ${required}>${customOptionList(items, current, allowCustom)}</select>${customInput}</div>`;
   }
 
   function serviceIconField(selected) {
@@ -539,7 +543,7 @@
     const isNew = !row;
     const item = { ...(row || { status: 'draft', is_active: true, sort_order: 0, rating: '', highlights: [], category: meta.categories[0]?.[0] || '', is_featured: false }), ...patch };
     const primary = meta.image ? `
-      ${customSelectField('الفئة', 'category', meta.categories, item.category, { customLabel: 'اكتب فئة مخصصة' })}
+      ${customSelectField('الفئة', 'category', meta.categories, item.category, { customLabel: 'اكتب فئة مخصصة', allowCustom: kind !== 'packages' })}
       ${field('العنوان بالعربية', 'title_ar', item.title_ar)}
       ${field('الوصف بالعربية', 'description_ar', item.description_ar, { textarea: true, full: true })}
       ${imageUploadField('image_file', 'image_url', editorValue(item.image_url, draftFallbacks.imageUrl), kind, 'صورة البطاقة')}

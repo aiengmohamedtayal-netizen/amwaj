@@ -27,7 +27,7 @@ function setLanguage(lang) {
         document.title = "Amwaj Travel | Premium Travel Agency in Egypt (Lic. 1766)";
     }
 
-
+    window.AmwajSyncSearchLanguage?.(lang);
 }
 
 // Auto-initialize language on script load

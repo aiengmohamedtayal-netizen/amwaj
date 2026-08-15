@@ -1,5 +1,7 @@
 # Amwaj Travel & Tourism Robots File
 User-agent: *
 Allow: /
+Disallow: /admin
+Disallow: /admin/
 
-Sitemap: https://www.amwajtravel.com/sitemap.xml
+Sitemap: https://amwaj-virid.vercel.app/sitemap.xml

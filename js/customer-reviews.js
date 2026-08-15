@@ -16,8 +16,6 @@
     const cooldownKey = 'amwaj_review_submission_cooldown_until';
     const cooldownMs = 60 * 1000;
 
-    if (!config || !config.url || !config.publishableKey) return;
-
     const copy = {
         ar: {
             sent: 'شكرًا لمشاركتك رأيك. استلمنا المراجعة وسيراجعها فريق أمواج قبل نشرها.',
@@ -88,7 +86,7 @@
     }
 
     async function loadApprovedReviews() {
-        if (!approvedGrid) return;
+        if (!approvedGrid || !config || !config.url || !config.publishableKey) return;
         try {
             const query = new URLSearchParams({
                 select: 'id,customer_name,rating,review_text,reviewed_at,submitted_at',
@@ -132,6 +130,11 @@
         }
         if (customerName.length < 2 || customerName.length > 90 || !Number.isInteger(rating) || rating < 1 || rating > 5 || reviewText.length < 10 || reviewText.length > 1200) {
             setFeedback('error', copy[locale].validation);
+            return;
+        }
+
+        if (!config || !config.url || !config.publishableKey) {
+            setFeedback('error', copy[locale].generic);
             return;
         }
 

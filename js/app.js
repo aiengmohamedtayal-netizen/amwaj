@@ -39,7 +39,7 @@ function openLightbox(src, caption) {
     const modal = document.getElementById('lightboxModal');
     const img   = document.getElementById('lightboxImg');
     const cap   = document.getElementById('lightboxCaption');
-    if (!modal || !img) return;
+    if (!modal || !img || !String(src || '').trim()) return;
     img.src = src;
     img.alt = caption || 'Gallery image';
     if (cap) cap.textContent = caption || '';

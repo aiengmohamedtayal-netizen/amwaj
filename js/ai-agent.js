@@ -161,6 +161,31 @@
     window.aiConversationHistory = window.aiConversationHistory || [];
     function optimizeHistory(history, maxMessages = 8) { return history.length <= maxMessages ? history : history.slice(-maxMessages); }
 
+    function parseInlineToolCall(text) {
+        const source = String(text || '');
+        const nameMatch = source.match(/(?:<<?\s*)?function\s*=\s*([A-Za-z][A-Za-z0-9_-]*)/i);
+        if (!nameMatch) return null;
+        const allowed = new Set(groqTools.map((tool) => tool.function.name));
+        if (!allowed.has(nameMatch[1])) return null;
+        const argsMatch = source.match(/\{[\s\S]*\}/);
+        let argumentsText = '{}';
+        if (argsMatch) {
+            try { JSON.parse(argsMatch[0]); argumentsText = argsMatch[0]; } catch (_) { /* wait for the complete streamed JSON */ }
+        }
+        return {
+            id: `inline_${Date.now()}`,
+            type: 'function',
+            function: { name: nameMatch[1], arguments: argumentsText }
+        };
+    }
+
+    function sanitizeAssistantText(text) {
+        const source = String(text || '');
+        const markerIndex = source.search(/(?:<<?\s*)?function\s*=/i);
+        if (markerIndex >= 0) return source.slice(0, markerIndex).trim();
+        return source.replace(/<<\s*\/?function[^>]*>>?/gi, '').trim();
+    }
+
     async function executeServerlessStream(endpointUrl, messages, tools, onChunk) {
         const response = await fetch(endpointUrl, {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages, tools, stream: true })
@@ -183,7 +208,11 @@
                 try {
                     const delta = JSON.parse(trimmed.slice(6)).choices?.[0]?.delta;
                     if (delta?.reasoning_content && !fullText && onChunk) onChunk('<i class="fa-solid fa-brain fa-pulse text-brand-500 mr-1"></i> *(جاري التفكير والتخطيط...)*\n\n');
-                    if (delta?.content) { fullText += delta.content; if (onChunk) onChunk(fullText); }
+                    if (delta?.content) {
+                        fullText += delta.content;
+                        const inlineToolCall = parseInlineToolCall(fullText);
+                        if (onChunk) onChunk(inlineToolCall ? '' : sanitizeAssistantText(fullText));
+                    }
                     if (delta?.tool_calls?.[0]) {
                         if (!toolCallData) toolCallData = delta.tool_calls[0];
                         else if (delta.tool_calls[0].function?.arguments) toolCallData.function.arguments = `${toolCallData.function.arguments || ''}${delta.tool_calls[0].function.arguments}`;
@@ -191,7 +220,10 @@
                 } catch (_) { /* Ignore incomplete SSE fragments. */ }
             }
         }
-        return toolCallData ? { type: 'tool_call', tool: toolCallData } : { type: 'text', text: fullText };
+        const inlineToolCall = parseInlineToolCall(fullText);
+        if (toolCallData) return { type: 'tool_call', tool: toolCallData };
+        if (inlineToolCall) return { type: 'tool_call', tool: inlineToolCall };
+        return { type: 'text', text: sanitizeAssistantText(fullText) };
     }
 
     async function callAiEndpoint(messages, tools, onChunk) {
@@ -267,7 +299,13 @@ RULES:
                     container.scrollTop = container.scrollHeight;
                 });
             }
-            window.aiConversationHistory.push({ role: 'assistant', content: result.text || '' });
+            const finalText = sanitizeAssistantText(result.text || '');
+            if (result.type === 'text' && !finalText) {
+                content.innerHTML = renderBusinessContinuationHtml();
+            } else if (result.type === 'text') {
+                content.innerHTML = formatMarkdown(finalText);
+            }
+            window.aiConversationHistory.push({ role: 'assistant', content: finalText });
         } catch (error) {
             console.error('AI assistant error:', error);
             content.innerHTML = renderBusinessContinuationHtml();

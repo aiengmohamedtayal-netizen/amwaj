@@ -30,6 +30,21 @@ function validMessages(messages) {
     return messages.every((message) => {
         if (!message || typeof message !== 'object') return false;
         if (!['system', 'user', 'assistant', 'tool'].includes(message.role)) return false;
+        // OpenAI-compatible tool turns legitimately use a null/omitted content field.
+        // Accept them only when the tool-call structure is present and bounded.
+        if (message.role === 'assistant' && Array.isArray(message.tool_calls)) {
+            return message.tool_calls.length > 0 && message.tool_calls.length <= 8 && message.tool_calls.every((call) => (
+                call && typeof call === 'object' &&
+                (typeof call.id === 'string' || typeof call.id === 'undefined') &&
+                call.function && typeof call.function.name === 'string' &&
+                call.function.name.length <= 120 &&
+                (typeof call.function.arguments === 'string' || typeof call.function.arguments === 'undefined')
+            ));
+        }
+        if (message.role === 'tool') {
+            return typeof message.tool_call_id === 'string' && message.tool_call_id.length <= 160 &&
+                typeof message.content === 'string' && message.content.length <= MAX_MESSAGE_CHARS;
+        }
         if (typeof message.content === 'string') return message.content.trim().length > 0 && message.content.length <= MAX_MESSAGE_CHARS;
         return Array.isArray(message.content) && message.content.length > 0;
     });

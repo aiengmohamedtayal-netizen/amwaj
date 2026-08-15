@@ -194,6 +194,13 @@ async function fetchLiveOffers(filters) {
     return offers;
 }
 
+function syncSearchLanguage(lang = document.documentElement.getAttribute('lang') || 'ar') {
+    document.querySelectorAll('#searchDestSelect option, #searchStyleSelect option').forEach((option) => {
+        const label = lang === 'en' ? option.dataset.labelEn : option.dataset.labelAr;
+        if (label) option.textContent = label;
+    });
+}
+
 async function populateDynamicDestinations() {
     const select = document.getElementById('searchDestSelect');
     if (!select || !AMWAJ_SEARCH_ENDPOINT || !AMWAJ_SEARCH_KEY) return;
@@ -205,7 +212,9 @@ async function populateDynamicDestinations() {
             if (legacyMatch || !destination.id) return;
             const option = document.createElement('option');
             option.value = `id:${destination.id}`;
-            option.textContent = `${destination.title_ar} / ${destination.title_en}`;
+            option.dataset.labelAr = destination.title_ar || destination.title_en || 'وجهة';
+            option.dataset.labelEn = destination.title_en || destination.title_ar || 'Destination';
+            option.textContent = (document.documentElement.getAttribute('lang') || 'ar') === 'en' ? option.dataset.labelEn : option.dataset.labelAr;
             select.append(option);
         });
     } catch {
@@ -244,5 +253,9 @@ async function handleTripSearch(e) {
     }
 }
 
-document.addEventListener('DOMContentLoaded', populateDynamicDestinations);
+window.AmwajSyncSearchLanguage = syncSearchLanguage;
+document.addEventListener('DOMContentLoaded', () => {
+    syncSearchLanguage();
+    populateDynamicDestinations();
+});
 window.AmwajLivePricingSearch = Object.freeze({ fetchLiveOffers, handleTripSearch });
