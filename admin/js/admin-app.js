@@ -240,20 +240,57 @@
     }
   }
 
+  const CUSTOM_SELECT_VALUE = '__other__';
+
   function categoryOptions(kind, selected) {
     return collectionMeta[kind].categories.map(([value, label]) => `<option value="${value}" ${selected === value ? 'selected' : ''}>${label}</option>`).join('');
   }
 
-  function serviceIconOptionsMarkup(selected) {
-    const current = String(selected || 'fa-star');
-    const known = serviceIconOptions.some(([value]) => value === current);
-    const currentOption = known ? '' : `<option value="${escapeHtml(current)}" selected>الأيقونة الحالية (${escapeHtml(current)})</option>`;
-    return currentOption + serviceIconOptions.map(([value, label]) => `<option value="${value}" ${current === value ? 'selected' : ''}>${label}</option>`).join('');
+  function customOptionList(items, selected) {
+    const current = String(selected ?? '');
+    const known = items.some(([value]) => value === current);
+    const selectedValue = known ? current : CUSTOM_SELECT_VALUE;
+    const currentOption = !known && current ? `<option value="${CUSTOM_SELECT_VALUE}" selected>أخرى (القيمة الحالية)</option>` : '';
+    const otherOption = !known && current ? currentOption : `<option value="${CUSTOM_SELECT_VALUE}" ${selectedValue === CUSTOM_SELECT_VALUE ? 'selected' : ''}>أخرى</option>`;
+    return `${items.map(([value, label]) => `<option value="${escapeHtml(value)}" ${selectedValue === value ? 'selected' : ''}>${escapeHtml(label)}</option>`).join('')}${otherOption}`;
+  }
+
+  function customSelectField(label, name, items, selected, options = {}) {
+    const current = String(selected ?? '');
+    const known = items.some(([value]) => value === current);
+    const isOther = !known;
+    const customValue = isOther ? current : '';
+    const className = options.full ? 'field full custom-select-field' : 'field custom-select-field';
+    const required = options.required === false ? '' : 'required';
+    const customLabel = options.customLabel || `اكتب ${label}`;
+    return `<div class="${className}" data-custom-select><label for="field-${name}">${label}</label><select class="select" id="field-${name}" name="${name}" data-custom-select-choice ${required}>${customOptionList(items, current)}</select><input class="input custom-option-input" name="${name}_custom" data-custom-select-value-for="${name}" type="text" value="${escapeHtml(customValue)}" placeholder="${escapeHtml(customLabel)}" ${isOther ? '' : 'hidden'}><span class="field-hint">اختر قيمة جاهزة أو «أخرى» لكتابة قيمة من عندك.</span></div>`;
   }
 
   function serviceIconField(selected) {
     const current = String(selected || 'fa-star');
-    return `<div class="field icon-picker-field"><label for="field-icon_class">الأيقونة المستخدمة للخدمة</label><div class="icon-picker"><select class="select" id="field-icon_class" name="icon_class" required>${serviceIconOptionsMarkup(current)}</select><span class="icon-picker-preview" data-icon-preview aria-hidden="true"><i class="fa-solid ${escapeHtml(current)}"></i></span></div><span class="field-hint">اختر أيقونة جاهزة؛ ستظهر المعاينة بجوار القائمة، ويمكنك تغييرها قبل الحفظ.</span></div>`;
+    const known = serviceIconOptions.some(([value]) => value === current);
+    return `<div class="field custom-select-field icon-picker-field" data-custom-select><label for="field-icon_class">الأيقونة المستخدمة للخدمة</label><div class="icon-picker"><select class="select" id="field-icon_class" name="icon_class" data-custom-select-choice required>${customOptionList(serviceIconOptions, current)}</select><span class="icon-picker-preview" data-icon-preview aria-hidden="true"><i class="fa-solid ${escapeHtml(current)}"></i></span></div><input class="input custom-option-input" name="icon_class_custom" data-custom-select-value-for="icon_class" type="text" value="${escapeHtml(known ? '' : current)}" placeholder="مثال: fa-camera" ${known ? 'hidden' : ''}><span class="field-hint">اختر أيقونة جاهزة، أو اختر «أخرى» واكتب فئة Font Awesome مخصصة. ستظهر المعاينة بجوار القائمة.</span></div>`;
+  }
+
+  function customSelectValue(form, name) {
+    const selected = String(form.querySelector(`[name="${name}"]`)?.value || '').trim();
+    if (selected !== CUSTOM_SELECT_VALUE) return selected;
+    return String(form.querySelector(`[name="${name}_custom"]`)?.value || '').trim();
+  }
+
+  function customOfferSelectField(label, name, items, selected, customLabel, compact = false) {
+    const current = String(selected ?? '');
+    const known = items.some(([value]) => value === current);
+    const id = compact ? '' : ` id="field-${name}"`;
+    return `<div class="${compact ? 'custom-select-compact' : 'custom-select-field'}" data-custom-select><label${compact ? ' class="sr-only"' : ` for="field-${name}"`}>${label}</label><select class="select${compact ? ' sheet-select' : ''}"${id} name="${name}" data-offer-field="${name}" data-custom-select-choice required>${customOptionList(items, current)}</select><input class="input${compact ? ' sheet-input' : ''} custom-option-input" name="${name}_custom" data-offer-field="${name}_custom" data-custom-select-value-for="${name}" type="text" value="${escapeHtml(known ? '' : current)}" placeholder="${escapeHtml(customLabel)}" ${known ? 'hidden' : ''}><span class="field-hint"${compact ? ' hidden' : ''}>اختر قيمة جاهزة أو «أخرى» لكتابة قيمة من عندك.</span></div>`;
+  }
+
+  function validateCustomSelections(container) {
+    container.querySelectorAll('[data-custom-select-choice]').forEach((select) => {
+      if (select.value !== CUSTOM_SELECT_VALUE) return;
+      const custom = container.querySelector(`[data-custom-select-value-for="${select.name}"]`);
+      if (!String(custom?.value || '').trim()) throw new Error(`اكتب القيمة المخصصة في حقل «${select.name}» بعد اختيار «أخرى».`);
+    });
   }
 
   function field(label, name, value, options) {
@@ -457,12 +494,26 @@
     document.body.append(dialog);
     dialog.querySelector('[data-close-dialog]')?.addEventListener('click', () => dialog.close());
     dialog.addEventListener('input', (event) => { if (event.target.closest('form')) setDirty(); });
+    const syncCustomSelect = (select, focusCustom = false) => {
+      const wrapper = select.closest('[data-custom-select]');
+      const customInput = wrapper?.querySelector(`[data-custom-select-value-for="${select.name}"]`);
+      const isOther = select.value === CUSTOM_SELECT_VALUE;
+      if (customInput) {
+        customInput.hidden = !isOther;
+        if (isOther && focusCustom) customInput.focus();
+      }
+      const preview = select.closest('.icon-picker')?.querySelector('[data-icon-preview] i');
+      if (preview) preview.className = `fa-solid ${(isOther ? customInput?.value : select.value) || 'fa-star'}`;
+    };
     dialog.addEventListener('change', (event) => {
       if (event.target.closest('form')) setDirty();
       if (event.target.matches('input[type="file"]')) updateLocalPreview(event.target);
-      if (event.target.matches('select[name="icon_class"]')) {
-        const preview = event.target.closest('.icon-picker')?.querySelector('[data-icon-preview] i');
-        if (preview) preview.className = `fa-solid ${event.target.value || 'fa-star'}`;
+      if (event.target.matches('select[data-custom-select-choice]')) syncCustomSelect(event.target, true);
+    });
+    dialog.addEventListener('input', (event) => {
+      if (event.target.matches('[data-custom-select-value-for]')) {
+        const select = dialog.querySelector(`[name="${event.target.dataset.customSelectValueFor}"]`);
+        if (select) syncCustomSelect(select);
       }
     });
     dialog.addEventListener('close', () => {
@@ -488,7 +539,7 @@
     const isNew = !row;
     const item = { ...(row || { status: 'draft', is_active: true, sort_order: 0, rating: '', highlights: [], category: meta.categories[0]?.[0] || '', is_featured: false }), ...patch };
     const primary = meta.image ? `
-      ${field('الفئة', 'category', item.category, { select: categoryOptions(kind, item.category) })}
+      ${customSelectField('الفئة', 'category', meta.categories, item.category, { customLabel: 'اكتب فئة مخصصة' })}
       ${field('العنوان بالعربية', 'title_ar', item.title_ar)}
       ${field('الوصف بالعربية', 'description_ar', item.description_ar, { textarea: true, full: true })}
       ${imageUploadField('image_file', 'image_url', editorValue(item.image_url, draftFallbacks.imageUrl), kind, 'صورة البطاقة')}
@@ -528,7 +579,7 @@
   function itemPayloadFromForm(kind, form, mode) {
     const data = new FormData(form);
     const meta = collectionMeta[kind];
-    const value = (name) => String(data.get(name) || '').trim();
+    const value = (name) => customSelectValue(form, name);
     const payload = {
       slug: value('slug') || autoSlug(value('title_en'), state.collections[kind], `${kind}-item`), title_ar: value('title_ar'), title_en: value('title_en'),
       description_ar: value('description_ar'), description_en: value('description_en'),
@@ -566,6 +617,7 @@
     const dialog = button.closest('dialog');
     const form = dialog.querySelector('#item-editor');
     if (!form.reportValidity()) return;
+    try { validateCustomSelections(form); } catch (error) { showToast('error', 'القيمة المخصصة ناقصة', error.message); return; }
     const kind = button.dataset.kind;
     const meta = collectionMeta[kind];
     const mode = button.dataset.mode;
@@ -681,7 +733,7 @@
       return `<tr data-offer-id="${item.id}">
         <td><select class="select sheet-select" data-offer-field="subject">${offerSubjectOptions(item)}</select><small class="muted">${escapeHtml(subject.title_en || '')}</small></td>
         <td><select class="select sheet-select" data-offer-field="destination_id">${offerDestinationOptions(item.destination_id)}</select><small class="muted">${escapeHtml(destination.title_ar)}</small></td>
-        <td><select class="select sheet-select" data-offer-field="trip_style">${optionList(offerStyles, item.trip_style)}</select></td>
+        <td>${customOfferSelectField('نوع الرحلة', 'trip_style', offerStyles, item.trip_style, 'اكتب نوع رحلة مخصصًا', true)}</td>
         <td><input class="input sheet-input" data-offer-field="departure_month" type="month" value="${escapeHtml(departureMonth(item.departure_month))}" aria-label="شهر السفر"></td>
         <td><div style="display:flex;gap:.4rem"><input class="input sheet-input" data-offer-field="min_travelers" type="number" min="1" value="${item.min_travelers}" aria-label="الحد الأدنى للمسافرين"><input class="input sheet-input" data-offer-field="max_travelers" type="number" min="1" value="${item.max_travelers}" aria-label="الحد الأقصى للمسافرين"></div></td>
         <td><select class="select sheet-select" data-offer-field="price_mode">${optionList(offerModes, item.price_mode)}</select></td>
@@ -729,10 +781,13 @@
   }
 
   function offerValue(container, name) {
-    return String(container.querySelector(`[data-offer-field="${name}"]`)?.value || '').trim();
+    const selected = String(container.querySelector(`[data-offer-field="${name}"]`)?.value || '').trim();
+    if (selected !== CUSTOM_SELECT_VALUE) return selected;
+    return String(container.querySelector(`[data-offer-field="${name}_custom"]`)?.value || '').trim();
   }
 
   function offerPayload(container, statusOverride) {
+    validateCustomSelections(container);
     const subject = offerValue(container, 'subject');
     const [subjectType, subjectId] = subject.split(':');
     const departure = offerValue(container, 'departure_month');
@@ -778,7 +833,7 @@
   function offerEditorBody(item) {
     const offer = item || { package_id: '', service_id: '', destination_id: '', trip_style: 'custom', departure_month: '', min_travelers: 1, max_travelers: 4, price_mode: 'fixed', price_amount: '', discounted_price_amount: '', availability: 'available', seats_available: '', status: 'draft', sort_order: 0, notes_ar: '', notes_en: '' };
     const advanced = `
-      <div class="field"><label for="field-trip_style">نوع الرحلة</label><select id="field-trip_style" class="select" data-offer-field="trip_style">${optionList(offerStyles, offer.trip_style)}</select></div>
+      ${customOfferSelectField('نوع الرحلة', 'trip_style', offerStyles, offer.trip_style, 'اكتب نوع رحلة مخصصًا')}
       <div class="field"><label for="field-price_mode">طريقة السعر</label><select id="field-price_mode" class="select" data-offer-field="price_mode">${optionList(offerModes, offer.price_mode)}</select><span class="field-hint">اترك السعر فارغًا في المسودة ليصبح «طلب عرض سعر».</span></div>
       <div class="field"><label for="field-discounted_price_amount">سعر الخصم للفرد (ج.م.)</label><input id="field-discounted_price_amount" class="input" data-offer-field="discounted_price_amount" type="number" min="0" step="0.01" value="${offer.discounted_price_amount ?? ''}"></div>
       <div class="field"><label for="field-seats_available">المقاعد المتاحة</label><input id="field-seats_available" class="input" data-offer-field="seats_available" type="number" min="0" value="${offer.seats_available ?? ''}"></div>
@@ -834,6 +889,7 @@
     const form = dialog.querySelector('#offer-editor');
     if (!form.reportValidity()) return;
     try {
+      validateCustomSelections(form);
       const payload = offerPayload(form, button.dataset.status);
       setButtonBusy(button, true);
       if (button.dataset.id) await client.update('pricing_offers', button.dataset.id, payload); else await client.create('pricing_offers', payload);
