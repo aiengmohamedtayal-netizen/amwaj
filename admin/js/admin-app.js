@@ -49,13 +49,13 @@
       categories: [], image: false, featured: false
     }
   };
-  // Central policy: only content/business fields may opt into a custom value.
-  // Package and destination categories remain fixed until the approved reference-table migration is applied.
+  // Central policy for business values. System-controlled fields stay fixed; approved
+  // business fields resolve custom labels to business_option_values before save.
   const customValuePolicy = Object.freeze({
-    packages: Object.freeze({ category: Object.freeze({ allowCustom: false, hint: 'القيم المدعومة حاليًا: VIP، عائلي، شهر عسل. دعم القيمة المخصصة مؤجل إلى Migration معتمدة.' }) }),
-    destinations: Object.freeze({ category: Object.freeze({ allowCustom: false, hint: 'القيم المدعومة حاليًا: داخل مصر، دولية، عمرة. دعم القيمة المخصصة مؤجل إلى Migration معتمدة.' }) }),
+    packages: Object.freeze({ category: Object.freeze({ allowCustom: true, fieldKey: 'package.category', referenceColumn: 'category_value_id', customLabel: 'اكتب اسم الفئة' }) }),
+    destinations: Object.freeze({ category: Object.freeze({ allowCustom: true, fieldKey: 'destination.category', referenceColumn: 'category_value_id', customLabel: 'اكتب اسم تصنيف الوجهة' }) }),
     services: Object.freeze({ icon_class: Object.freeze({ allowCustom: true, customLabel: 'مثال: fa-camera' }) }),
-    pricing_offers: Object.freeze({ trip_style: Object.freeze({ allowCustom: false, hint: 'اختر نوعًا من القيم المدعومة. خيار «مخصصة» قيمة نظامية وليس حقل نص حر.' }) })
+    pricing_offers: Object.freeze({ trip_style: Object.freeze({ allowCustom: true, fieldKey: 'pricing.trip_style', referenceColumn: 'trip_style_value_id', customLabel: 'اكتب نوع رحلة مخصصًا' }) })
   });
   const state = { auth: null, page: 'dashboard', collections: {}, search: '' };
   const editorPrefillStorageKey = 'amwaj_admin_copilot_editor_prefill';
@@ -291,6 +291,32 @@
     const selected = String(form.querySelector(`[name="${name}"]`)?.value || '').trim();
     if (selected !== CUSTOM_SELECT_VALUE) return selected;
     return String(form.querySelector(`[name="${name}_custom"]`)?.value || '').trim();
+  }
+
+  function isOtherSelection(form, name) {
+    return String(form.querySelector(`[name="${name}"]`)?.value || '').trim() === CUSTOM_SELECT_VALUE;
+  }
+
+  async function resolveBusinessReference(kind, form, payload) {
+    const rules = customValuePolicy[kind] || {};
+    for (const [name, rule] of Object.entries(rules)) {
+      if (!rule.fieldKey || !rule.referenceColumn || !isOtherSelection(form, name)) continue;
+      const label = customSelectValue(form, name);
+      const option = await client.resolveBusinessOption(rule.fieldKey, label, label);
+      if (!option?.id) throw new Error('تعذر اعتماد القيمة المخصصة. أعد المحاولة أو اختر قيمة جاهزة.');
+      payload[name] = String(option.label_ar || label).trim();
+      payload[rule.referenceColumn] = option.id;
+    }
+    return payload;
+  }
+
+  function clearBusinessReferenceForKnownValue(kind, form, payload) {
+    const rules = customValuePolicy[kind] || {};
+    Object.entries(rules).forEach(([name, rule]) => {
+      if (!rule.referenceColumn || !form.querySelector(`[name="${name}"]`)) return;
+      if (!isOtherSelection(form, name)) payload[rule.referenceColumn] = null;
+    });
+    return payload;
   }
 
   function customOfferSelectField(label, name, items, selected, customLabel, compact = false, options = {}) {
@@ -670,6 +696,8 @@
         form.querySelector('[name="image_url"]').value = upload.publicUrl;
       }
       const payload = itemPayloadFromForm(kind, form, mode);
+      clearBusinessReferenceForKnownValue(kind, form, payload);
+      await resolveBusinessReference(kind, form, payload);
       if (mode === 'published') {
         const issues = itemPublishIssues(kind, payload);
         if (issues.length) throw new Error(`للنشر، أكمل: ${issues.join('، ')}.`);
@@ -826,7 +854,7 @@
     return String(container.querySelector(`[data-offer-field="${name}_custom"]`)?.value || '').trim();
   }
 
-  function offerPayload(container, statusOverride) {
+  async function offerPayload(container, statusOverride) {
     validateCustomSelections(container);
     validateFixedBusinessValues('pricing_offers', container);
     const subject = offerValue(container, 'subject');
@@ -849,11 +877,12 @@
     if (!Number.isInteger(minTravelers) || !Number.isInteger(maxTravelers) || minTravelers < 1 || maxTravelers < minTravelers) throw new Error('حدّد نطاق المسافرين بشكل صحيح: الرقم الأدنى لا يتجاوز الأعلى.');
     if (status === 'published' && (mode === 'fixed' || mode === 'starting_from') && (price === null || price < 0)) throw new Error('للنشر، أدخل السعر للفرد أو اختر «طلب عرض سعر» من الإعدادات المتقدمة.');
     if (status === 'published' && mode === 'discount' && (price === null || discounted === null || price < 0 || discounted < 0 || discounted >= price)) throw new Error('للنشر بسعر مخفض، أدخل السعر الأساسي وسعر خصم أقل منه.');
-    return {
+    const payload = {
       package_id: subjectType === 'package' ? subjectId : null,
       service_id: subjectType === 'service' ? subjectId : null,
       destination_id: offerValue(container, 'destination_id'),
       trip_style: offerValue(container, 'trip_style') || 'custom',
+      trip_style_value_id: null,
       departure_month: `${departure}-01`,
       min_travelers: minTravelers,
       max_travelers: maxTravelers,
@@ -869,6 +898,14 @@
       status,
       sort_order: Math.max(0, Number(offerValue(container, 'sort_order') || 0))
     };
+    if (isOtherSelection(container, 'trip_style')) {
+      const label = offerValue(container, 'trip_style');
+      const option = await client.resolveBusinessOption('pricing.trip_style', label, label);
+      if (!option?.id) throw new Error('تعذر اعتماد نوع الرحلة المخصص. أعد المحاولة أو اختر قيمة جاهزة.');
+      payload.trip_style = String(option.label_ar || label).trim();
+      payload.trip_style_value_id = option.id;
+    }
+    return payload;
   }
 
   function offerEditorBody(item) {
@@ -905,7 +942,7 @@
   async function saveOfferRow(button) {
     const row = button.closest('tr');
     try {
-      const payload = offerPayload(row);
+      const payload = await offerPayload(row);
       setButtonBusy(button, true);
       await client.update('pricing_offers', button.dataset.id, payload);
       showToast('success', 'تم حفظ صف السعر', 'تم تحديث العرض في قاعدة البيانات المركزية.');
@@ -931,7 +968,7 @@
     if (!form.reportValidity()) return;
     try {
       validateCustomSelections(form);
-      const payload = offerPayload(form, button.dataset.status);
+      const payload = await offerPayload(form, button.dataset.status);
       setButtonBusy(button, true);
       if (button.dataset.id) await client.update('pricing_offers', button.dataset.id, payload); else await client.create('pricing_offers', payload);
       dialog.close();

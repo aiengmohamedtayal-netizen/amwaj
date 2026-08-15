@@ -360,10 +360,14 @@ RULES:
             data.destinations.forEach((destination) => {
                 const option = document.createElement('option');
                 option.value = destination.title_ar || destination.title_en;
-                option.textContent = `${destination.title_ar || ''}${destination.title_en ? ` / ${destination.title_en}` : ''}`;
+                option.dataset.labelAr = destination.title_ar || destination.title_en || 'وجهة';
+                option.dataset.labelEn = destination.title_en || destination.title_ar || 'Destination';
+                const lang = document.documentElement.getAttribute('lang') || 'ar';
+                option.textContent = lang === 'en' ? option.dataset.labelEn : option.dataset.labelAr;
                 select.append(option);
             });
             select.dataset.loaded = 'true';
+            window.AmwajSyncSearchLanguage?.(document.documentElement.getAttribute('lang') || 'ar');
         } catch (_) { /* Manual details remain available as a fallback. */ }
     }
 

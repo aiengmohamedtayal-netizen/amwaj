@@ -195,7 +195,7 @@ async function fetchLiveOffers(filters) {
 }
 
 function syncSearchLanguage(lang = document.documentElement.getAttribute('lang') || 'ar') {
-    document.querySelectorAll('#searchDestSelect option, #searchStyleSelect option').forEach((option) => {
+    document.querySelectorAll('#searchDestSelect option, #searchStyleSelect option, #plannerDestination option, #plannerStyle option').forEach((option) => {
         const label = lang === 'en' ? option.dataset.labelEn : option.dataset.labelAr;
         if (label) option.textContent = label;
     });

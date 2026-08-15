@@ -203,6 +203,38 @@
     });
   }
 
+  function normalizeBusinessLabel(value) {
+    return String(value || '').normalize('NFKC').trim().replace(/\s+/g, ' ').toLocaleLowerCase();
+  }
+
+  async function resolveBusinessOption(fieldKey, label, englishLabel) {
+    const cleanLabel = String(label || '').normalize('NFKC').trim().replace(/\s+/g, ' ');
+    if (!cleanLabel) throw new Error('اكتب قيمة مخصصة قبل الحفظ.');
+    if (cleanLabel.length > 120) throw new Error('القيمة المخصصة يجب ألا تتجاوز 120 حرفًا.');
+    const normalized = normalizeBusinessLabel(cleanLabel);
+    const english = String(englishLabel || cleanLabel).normalize('NFKC').trim().replace(/\s+/g, ' ').slice(0, 120) || cleanLabel;
+    const params = `field_key=eq.${encodeURIComponent(fieldKey)}&normalized_label=eq.${encodeURIComponent(normalized)}&is_active=eq.true&limit=1`;
+    const existing = await rest(`business_option_values?select=id,field_key,value_key,normalized_label,label_ar,label_en,source,is_active&${params}`, { method: 'GET' });
+    if (Array.isArray(existing) && existing[0]) return existing[0];
+    try {
+      const created = await create('business_option_values', {
+        field_key: fieldKey,
+        value_key: cleanLabel,
+        normalized_label: normalized,
+        label_ar: cleanLabel,
+        label_en: english,
+        source: 'custom',
+        is_active: true,
+        sort_order: 1000
+      });
+      return Array.isArray(created) ? created[0] : created;
+    } catch (error) {
+      const duplicate = await rest(`business_option_values?select=id,field_key,value_key,normalized_label,label_ar,label_en,source,is_active&${params}`, { method: 'GET' });
+      if (Array.isArray(duplicate) && duplicate[0]) return duplicate[0];
+      throw error;
+    }
+  }
+
   async function remove(table, id) {
     return rest(`${table}?id=eq.${encodeURIComponent(id)}`, {
       method: 'DELETE',
@@ -253,6 +285,8 @@
     remove,
     uploadImage,
     publicMediaUrl,
-    updateSetting
+    updateSetting,
+    resolveBusinessOption,
+    normalizeBusinessLabel
   });
 }());
