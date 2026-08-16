@@ -189,12 +189,20 @@
           <img src="/assets/logo.png" alt="شعار أمواج للسياحة"><span><strong>أمواج للسياحة</strong><small>AMWAJ ADMIN</small></span>
         </a>
         <nav class="nav-group" aria-label="أقسام الإدارة"><span class="nav-title">القائمة الرئيسية</span>
-          ${links.map(([key, icon, label]) => `<a class="nav-link ${state.page === key ? 'is-active' : ''}" href="${adminPath(key)}" data-action="navigate" ${state.page === key ? 'aria-current="page"' : ''}><i class="nav-icon fa-solid ${icon}" aria-hidden="true"></i><span>${label}</span></a>`).join('')}
+          ${links.map(([key, icon, label]) => `<a class="nav-link ${state.page === key ? 'is-active' : ''}" href="${adminPath(key)}" data-action="navigate" ${state.page === key ? 'aria-current="page"' : ''}><i class="nav-icon fa-solid ${icon}" aria-hidden="true"></i><span class="nav-label">${label}</span><i class="nav-link-arrow fa-solid fa-chevron-left" aria-hidden="true"></i></a>`).join('')}
         </nav>
         <div class="sidebar-footer">
-          <p class="user-name" title="${escapeHtml(profile.full_name || state.auth.session?.user?.email || '')}"><i class="fa-solid fa-user-shield" aria-hidden="true"></i> ${escapeHtml(profile.full_name || state.auth.session?.user?.email || 'مدير أمواج')}</p>
-          <button class="btn btn-ghost btn-small" type="button" data-action="sign-out"><i class="fa-solid fa-right-from-bracket"></i> تسجيل الخروج</button>
-          <p class="developer-credit" dir="ltr">Developed by YOMNA ELHAMAMSY</p>
+          <div class="sidebar-user-card">
+            <span class="sidebar-user-avatar"><i class="fa-solid fa-user" aria-hidden="true"></i><b aria-hidden="true"></b></span>
+            <span class="sidebar-user-copy"><strong title="${escapeHtml(profile.full_name || state.auth.session?.user?.email || '')}">${escapeHtml(profile.full_name || 'Amwaj Travel Administrator')}</strong><small>مدير النظام</small></span>
+            <span class="sidebar-user-menu" aria-hidden="true"><i class="fa-solid fa-ellipsis-vertical"></i></span>
+          </div>
+          <button class="sidebar-signout btn btn-ghost" type="button" data-action="sign-out"><i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i> تسجيل الخروج</button>
+          <button class="sidebar-assistant-card" type="button" data-copilot="toggle" aria-label="فتح مساعد أمواج الإداري">
+            <span class="sidebar-assistant-copy"><strong>مساعد أمواج</strong><small>خدمتك في أي وقت</small></span>
+            <span class="sidebar-assistant-icon"><i class="fa-solid fa-message" aria-hidden="true"></i></span>
+          </button>
+          <p class="developer-credit" dir="ltr"><i class="fa-solid fa-code" aria-hidden="true"></i><span>Developed by</span><strong>YOMNA ELHAMAMSY</strong></p>
         </div>
       </aside>
       <button class="sidebar-backdrop" type="button" data-action="close-nav" aria-label="إغلاق القائمة الجانبية"></button>
