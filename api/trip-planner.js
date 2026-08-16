@@ -67,6 +67,15 @@ function cleanPlan(value) {
     };
 }
 
+function allowedOrigin(origin) {
+    const value = String(origin || '').trim();
+    if (!value) return '';
+    const configured = String(process.env.ALLOWED_ORIGINS || '').split(',').map((item) => item.trim()).filter(Boolean);
+    const defaults = ['https://amwaj-virid.vercel.app'];
+    const isAmwajPreview = /^https:\/\/amwaj-[a-z0-9-]+\.vercel\.app$/i.test(value);
+    return [...new Set([...configured, ...defaults])].includes(value) || isAmwajPreview ? value : '';
+}
+
 function configuredProviders() {
     const sovereignKey = String(process.env.SOVEREIGN_EG_API_KEY || '').trim();
     const groqKey = String(process.env.GROQ_API_KEY || '').trim();
@@ -104,10 +113,12 @@ async function requestPlan(provider, messages) {
 }
 
 export default async function handler(req, res) {
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    const origin = allowedOrigin(req.headers.origin);
+    if (origin) res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-    if (req.method === 'OPTIONS') return res.status(200).end();
+    if (req.method === 'OPTIONS') return origin ? res.status(204).end() : res.status(403).json({ error: 'Origin Not Allowed' });
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
 
     const ip = clientIp(req);

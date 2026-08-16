@@ -57,8 +57,41 @@
     services: Object.freeze({ icon_class: Object.freeze({ allowCustom: true, customLabel: 'مثال: fa-camera' }) }),
     pricing_offers: Object.freeze({ trip_style: Object.freeze({ allowCustom: true, fieldKey: 'pricing.trip_style', referenceColumn: 'trip_style_value_id', customLabel: 'اكتب نوع رحلة مخصصًا' }) })
   });
-  const state = { auth: null, page: 'dashboard', collections: {}, search: '' };
+  const state = { auth: null, page: 'dashboard', collections: {}, search: '', businessOptions: {} };
   const editorPrefillStorageKey = 'amwaj_admin_copilot_editor_prefill';
+  async function loadBusinessOptions() {
+    try {
+      const rows = await client.list('business_option_values', {
+        select: 'id,field_key,value_key,label_ar,label_en,is_active,sort_order',
+        order: 'field_key.asc,sort_order.asc,label_ar.asc',
+        filters: { is_active: 'eq.true' }
+      });
+      state.businessOptions = (Array.isArray(rows) ? rows : []).reduce((groups, row) => {
+        const key = String(row.field_key || '').trim();
+        if (!key) return groups;
+        (groups[key] ||= []).push(row);
+        return groups;
+      }, {});
+    } catch {
+      state.businessOptions = {};
+    }
+    return state.businessOptions;
+  }
+
+  function businessOptionItems(fieldKey, fallbackItems) {
+    const items = Array.isArray(fallbackItems) ? fallbackItems.slice() : [];
+    const seen = new Set(items.map(([value]) => String(value)));
+    (state.businessOptions[String(fieldKey || '').trim()] || []).forEach((row) => {
+      const value = String(row.value_key || row.label_ar || '').trim();
+      const label = String(row.label_ar || row.label_en || value).trim();
+      if (value && !seen.has(value)) {
+        items.push([value, label]);
+        seen.add(value);
+      }
+    });
+    return items;
+  }
+
   const draftFallbacks = {
     imageUrl: '/assets/logo.png',
     priceLabelAr: 'قيد التحديث',
@@ -269,8 +302,9 @@
 
   function customSelectField(label, name, items, selected, options = {}) {
     const allowCustom = options.allowCustom !== false;
+    const availableItems = businessOptionItems(options.fieldKey, items);
     const current = String(selected ?? '');
-    const known = items.some(([value]) => value === current);
+    const known = availableItems.some(([value]) => value === current);
     const isOther = allowCustom && !known;
     const customValue = isOther ? current : '';
     const className = options.full ? 'field full custom-select-field' : 'field custom-select-field';
@@ -278,7 +312,7 @@
     const customLabel = options.customLabel || `اكتب ${label}`;
     const hint = options.hint || (allowCustom ? 'اختر قيمة جاهزة أو «أخرى» لكتابة قيمة من عندك.' : 'القائمة تعرض القيم النظامية المدعومة حاليًا.');
     const customInput = allowCustom ? `<input class="input custom-option-input" name="${name}_custom" data-custom-select-value-for="${name}" type="text" value="${escapeHtml(customValue)}" placeholder="${escapeHtml(customLabel)}" ${isOther ? '' : 'hidden'}><span class="field-hint">${escapeHtml(hint)}</span>` : `<span class="field-hint">${escapeHtml(hint)}</span>`;
-    return `<div class="${className}" data-custom-select><label for="field-${name}">${label}</label><select class="select" id="field-${name}" name="${name}" data-custom-select-choice ${required}>${customOptionList(items, current, allowCustom)}</select>${customInput}</div>`;
+    return `<div class="${className}" data-custom-select><label for="field-${name}">${label}</label><select class="select" id="field-${name}" name="${name}" data-custom-select-choice ${required}>${customOptionList(availableItems, current, allowCustom)}</select>${customInput}</div>`;
   }
 
   function serviceIconField(selected) {
@@ -304,6 +338,7 @@
       const label = customSelectValue(form, name);
       const option = await client.resolveBusinessOption(rule.fieldKey, label, label);
       if (!option?.id) throw new Error('تعذر اعتماد القيمة المخصصة. أعد المحاولة أو اختر قيمة جاهزة.');
+      (state.businessOptions[rule.fieldKey] ||= []).push(option);
       payload[name] = String(option.label_ar || label).trim();
       payload[rule.referenceColumn] = option.id;
     }
@@ -321,12 +356,13 @@
 
   function customOfferSelectField(label, name, items, selected, customLabel, compact = false, options = {}) {
     const allowCustom = options.allowCustom !== false;
+    const availableItems = businessOptionItems(options.fieldKey, items);
     const current = String(selected ?? '');
-    const known = items.some(([value]) => value === current);
+    const known = availableItems.some(([value]) => value === current);
     const id = compact ? '' : ` id="field-${name}"`;
     const hint = options.hint || 'اختر قيمة جاهزة أو «أخرى» لكتابة قيمة من عندك.';
     const input = allowCustom ? `<input class="input${compact ? ' sheet-input' : ''} custom-option-input" name="${name}_custom" data-offer-field="${name}_custom" data-custom-select-value-for="${name}" type="text" value="${escapeHtml(known ? '' : current)}" placeholder="${escapeHtml(customLabel)}" ${known ? 'hidden' : ''}>` : '';
-    return `<div class="${compact ? 'custom-select-compact' : 'custom-select-field'}" data-custom-select><label${compact ? ' class="sr-only"' : ` for="field-${name}"`}>${label}</label><select class="select${compact ? ' sheet-select' : ''}"${id} name="${name}" data-offer-field="${name}" data-custom-select-choice required>${customOptionList(items, current, allowCustom)}</select>${input}<span class="field-hint"${compact ? ' hidden' : ''}>${escapeHtml(hint)}</span></div>`;
+    return `<div class="${compact ? 'custom-select-compact' : 'custom-select-field'}" data-custom-select><label${compact ? ' class="sr-only"' : ` for="field-${name}"`}>${label}</label><select class="select${compact ? ' sheet-select' : ''}"${id} name="${name}" data-offer-field="${name}" data-custom-select-choice required>${customOptionList(availableItems, current, allowCustom)}</select>${input}<span class="field-hint"${compact ? ' hidden' : ''}>${escapeHtml(hint)}</span></div>`;
   }
 
   function validateCustomSelections(container) {
@@ -831,6 +867,7 @@
   async function renderPricing() {
     app.innerHTML = layout(`${pageHeader('جدول أسعار محرك البحث', 'أدخل عروضًا لكل برنامج أو خدمة ثم احفظها كمسودة أو انشرها لتصل إلى محرك البحث.')}${loadingMarkup('جارٍ تحميل جدول الأسعار…')}`);
     try {
+      await loadBusinessOptions();
       const [offers, packages, destinations, services] = await Promise.all([
         client.list('pricing_offers', { order: 'departure_month.desc,sort_order.asc,updated_at.desc' }),
         client.list('packages', { order: 'sort_order.asc,title_ar.asc' }),
@@ -902,6 +939,7 @@
       const label = offerValue(container, 'trip_style');
       const option = await client.resolveBusinessOption('pricing.trip_style', label, label);
       if (!option?.id) throw new Error('تعذر اعتماد نوع الرحلة المخصص. أعد المحاولة أو اختر قيمة جاهزة.');
+      (state.businessOptions['pricing.trip_style'] ||= []).push(option);
       payload.trip_style = String(option.label_ar || label).trim();
       payload.trip_style_value_id = option.id;
     }
@@ -1462,8 +1500,8 @@
     if (action === 'reload-page') renderPage();
     if (action === 'export-pdf') { window.print(); }
     if (action === 'sign-out') { await client.signOut(); window.location.replace('/admin/login/'); }
-    if (action === 'new-item') openItemEditor(target.dataset.kind, null);
-    if (action === 'edit-item') { const row = (state.collections[target.dataset.kind] || []).find((item) => item.id === target.dataset.id); if (row) openItemEditor(target.dataset.kind, row); }
+    if (action === 'new-item') { await loadBusinessOptions(); openItemEditor(target.dataset.kind, null); }
+    if (action === 'edit-item') { const row = (state.collections[target.dataset.kind] || []).find((item) => item.id === target.dataset.id); if (row) { await loadBusinessOptions(); openItemEditor(target.dataset.kind, row); } }
     if (action === 'preview') { const row = (state.collections[target.dataset.kind] || []).find((item) => item.id === target.dataset.id); if (row) openPreview(target.dataset.kind, row); }
     if (action === 'save-item') saveItem(target);
     if (action === 'generate-english') generateEnglish(target);
@@ -1471,8 +1509,8 @@
     if (action === 'toggle-featured') updateItemAction(target.dataset.kind, target.dataset.id, 'featured');
     if (action === 'toggle-archive') { const row = (state.collections[target.dataset.kind] || []).find((item) => item.id === target.dataset.id); if (row) updateItemAction(target.dataset.kind, target.dataset.id, row.is_active ? 'archive' : 'restore'); }
     if (action === 'delete-item') deleteItem(target.dataset.kind, target.dataset.id);
-    if (action === 'new-offer') openOfferEditor(null);
-    if (action === 'edit-offer') { const row = (state.pricing?.offers || []).find((item) => item.id === target.dataset.id); if (row) openOfferEditor(row); }
+    if (action === 'new-offer') { await loadBusinessOptions(); openOfferEditor(null); }
+    if (action === 'edit-offer') { const row = (state.pricing?.offers || []).find((item) => item.id === target.dataset.id); if (row) { await loadBusinessOptions(); openOfferEditor(row); } }
     if (action === 'preview-offer') { const row = (state.pricing?.offers || []).find((item) => item.id === target.dataset.id); if (row) openOfferPreview(row); }
     if (action === 'save-offer-row') saveOfferRow(target);
     if (action === 'delete-offer') deleteOffer(target.dataset.id);
@@ -1504,6 +1542,7 @@
     app.innerHTML = '<main class="loading-state" aria-label="جارٍ التحقق من صلاحية الوصول"><div class="spinner" aria-hidden="true"></div><p>جارٍ التحقق من صلاحية الوصول…</p></main>';
     state.auth = await client.requireAdmin();
     if (!state.auth.isAdmin) { window.location.replace('/admin/login/'); return; }
+    await loadBusinessOptions();
     await renderPage();
   }
 

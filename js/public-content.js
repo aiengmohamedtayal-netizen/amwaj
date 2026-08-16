@@ -30,9 +30,35 @@
         family: { ar: 'العروض العائلية', en: 'Family Package', color: 'bg-brand-500 text-white', icon: 'fa-people-group', button: 'bg-brand-500 hover:bg-brand-600 text-white', actionAr: 'احجز للعائلة', actionEn: 'Book Family' },
         honeymoon: { ar: 'شهر العسل', en: 'Honeymoon', color: 'bg-tealCustom-500 text-white', icon: 'fa-heart', button: 'bg-tealCustom-500 hover:bg-tealCustom-600 text-white', actionAr: 'احجز شهر العسل', actionEn: 'Book Honeymoon' }
     };
+    const businessOptionCache = new Map();
+    const customDestinationMeta = { color: 'bg-tealCustom-500 text-white' };
+    const customPackageMeta = { color: 'bg-brand-500 text-white', icon: 'fa-suitcase', button: 'bg-brand-500 hover:bg-brand-600 text-white', actionAr: 'احجز البرنامج', actionEn: 'Book Now' };
 
     function bilingual(ar, en) {
         return `<span class="lang-en">${escapeHtml(en)}</span><span class="lang-ar">${escapeHtml(ar)}</span>`;
+    }
+
+    async function fetchBusinessOptions(fieldKey) {
+        if (businessOptionCache.has(fieldKey)) return businessOptionCache.get(fieldKey);
+        try {
+            const query = new URLSearchParams({ select: 'id,field_key,value_key,label_ar,label_en,is_active,sort_order', field_key: `eq.${fieldKey}`, is_active: 'eq.true', order: 'sort_order.asc,label_ar.asc' });
+            const response = await fetch(`${config.url}/rest/v1/business_option_values?${query.toString()}`, { headers: { apikey: config.publishableKey, Accept: 'application/json' } });
+            if (!response.ok) throw new Error(`Public business options request failed (${response.status})`);
+            const options = await response.json();
+            const safeOptions = Array.isArray(options) ? options : [];
+            businessOptionCache.set(fieldKey, safeOptions);
+            return safeOptions;
+        } catch (error) {
+            console.warn('Amwaj business options enhancement unavailable; fallback labels remain visible.', error);
+            businessOptionCache.set(fieldKey, []);
+            return [];
+        }
+    }
+
+    function customLabelMeta(item, fallback, defaults) {
+        const option = item._businessOption;
+        if (!option) return fallback;
+        return { ...defaults, ar: option.label_ar || option.value_key, en: option.label_en || option.label_ar || option.value_key };
     }
 
     function priceLabel(item) {
@@ -69,7 +95,7 @@
     }
 
     function destinationCard(item, index) {
-        const meta = destinationMeta[item.category] || destinationMeta.international;
+        const meta = customLabelMeta(item, destinationMeta[item.category] || destinationMeta.international, customDestinationMeta);
         const delay = index % 3 === 1 ? ' reveal-d1' : index % 3 === 2 ? ' reveal-d2' : '';
         const rating = Number(item.rating);
         const ratingMarkup = Number.isFinite(rating) ? `<div class="absolute top-4 right-4 rtl:right-auto rtl:left-4 px-2.5 py-1 rounded-lg bg-black/60 text-goldAccent-400 font-bold text-xs backdrop-blur border border-white/10 flex items-center gap-1"><i class="fa-solid fa-star text-goldAccent-500"></i>${escapeHtml(rating.toFixed(1))}</div>` : '';
@@ -81,7 +107,7 @@
     }
 
     function packageCard(item, index) {
-        const meta = packageMeta[item.category] || packageMeta.vip;
+        const meta = customLabelMeta(item, packageMeta[item.category] || packageMeta.vip, customPackageMeta);
         const delay = index % 3 === 1 ? ' reveal-d1' : index % 3 === 2 ? ' reveal-d2' : '';
         const rating = Number(item.rating);
         const ratingMarkup = Number.isFinite(rating) ? `<div class="absolute top-4 right-4 rtl:right-auto rtl:left-4 px-2.5 py-1 rounded-lg bg-black/60 text-goldAccent-400 font-bold text-xs backdrop-blur border border-white/10 flex items-center gap-1"><i class="fa-solid fa-star text-goldAccent-500"></i>${escapeHtml(rating.toFixed(1))}</div>` : '';
@@ -110,11 +136,16 @@
         }));
     }
 
-    async function hydrate(grid, table, select, render) {
+    async function hydrate(grid, table, select, render, optionFieldKey, optionColumn) {
         if (!grid) return;
         try {
-            const records = await fetchPublished(table, select);
+            let records = await fetchPublished(table, select);
             if (!Array.isArray(records) || !records.length) return;
+            if (optionFieldKey && optionColumn) {
+                const options = await fetchBusinessOptions(optionFieldKey);
+                const byId = new Map(options.map((option) => [option.id, option]));
+                records = records.map((record) => ({ ...record, _businessOption: byId.get(record[optionColumn]) || null }));
+            }
             grid.innerHTML = records.map(render).join('');
             grid.dataset.source = 'supabase';
             attachBookingListeners(grid);
@@ -126,10 +157,10 @@
     }
 
     function hydratePublicContent() {
-        const cardSelect = 'id,slug,category,title_ar,title_en,description_ar,description_en,image_url,image_alt_ar,image_alt_en,badge_ar,badge_en,rating,highlights,price_label_ar,price_label_en,sort_order,created_at';
+        const cardSelect = 'id,slug,category,category_value_id,title_ar,title_en,description_ar,description_en,image_url,image_alt_ar,image_alt_en,badge_ar,badge_en,rating,highlights,price_label_ar,price_label_en,sort_order,created_at';
         const packageSelect = `${cardSelect},price_amount,discounted_price_amount,currency`;
-        hydrate(grids.destinations, 'destinations', cardSelect, destinationCard);
-        hydrate(grids.packages, 'packages', packageSelect, packageCard);
+        hydrate(grids.destinations, 'destinations', cardSelect, destinationCard, 'destination.category', 'category_value_id');
+        hydrate(grids.packages, 'packages', packageSelect, packageCard, 'package.category', 'category_value_id');
         hydrate(grids.services, 'services', 'id,slug,icon_class,title_ar,title_en,description_ar,description_en,sort_order,created_at', serviceCard);
     }
 

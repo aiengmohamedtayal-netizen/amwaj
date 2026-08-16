@@ -9,6 +9,30 @@ const TOTAL_BOOKING_STEPS = 3;
 const AMWAJ_SEARCH_ENDPOINT = window.AMWAJ_CONFIG?.supabase?.url?.replace(/\/$/, '') || '';
 const AMWAJ_SEARCH_KEY = window.AMWAJ_CONFIG?.supabase?.publishableKey || '';
 const LEGACY_DESTINATION_VALUES = new Set(['all', 'egypt', 'international', 'umrah']);
+const publicBusinessOptionCache = new Map();
+
+async function fetchPublicBusinessOptions(fieldKey) {
+    if (publicBusinessOptionCache.has(fieldKey)) return publicBusinessOptionCache.get(fieldKey);
+    try {
+        const options = await publicSupabaseRequest('business_option_values', {
+            select: 'id,field_key,value_key,label_ar,label_en,is_active,sort_order',
+            field_key: `eq.${fieldKey}`,
+            is_active: 'eq.true',
+            order: 'sort_order.asc,label_ar.asc'
+        });
+        const safeOptions = Array.isArray(options) ? options : [];
+        publicBusinessOptionCache.set(fieldKey, safeOptions);
+        return safeOptions;
+    } catch {
+        publicBusinessOptionCache.set(fieldKey, []);
+        return [];
+    }
+}
+
+function businessOptionLabel(option, lang = document.documentElement.getAttribute('lang') || 'ar') {
+    if (!option) return '';
+    return lang === 'en' ? (option.label_en || option.label_ar || option.value_key) : (option.label_ar || option.label_en || option.value_key);
+}
 
 function openBookingModal(destinationName = '') {
     if (destinationName) {
@@ -173,7 +197,7 @@ async function publicSupabaseRequest(table, params) {
 
 async function fetchLiveOffers(filters) {
     const params = {
-        select: 'id,package_id,service_id,destination_id,trip_style,departure_month,min_travelers,max_travelers,price_mode,price_amount,discounted_price_amount,currency,availability,seats_available,notes_ar,notes_en,sort_order,packages(title_ar,title_en,slug),services(title_ar,title_en,slug),destinations(title_ar,title_en,slug,category,image_url)',
+        select: 'id,package_id,service_id,destination_id,trip_style,trip_style_value_id,departure_month,min_travelers,max_travelers,price_mode,price_amount,discounted_price_amount,currency,availability,seats_available,notes_ar,notes_en,sort_order,packages(title_ar,title_en,slug),services(title_ar,title_en,slug),destinations(title_ar,title_en,slug,category,category_value_id,image_url)',
         order: 'sort_order.asc,departure_month.asc'
     };
     if (filters.month) params.departure_month = `eq.${filters.month}-01`;
@@ -185,13 +209,19 @@ async function fetchLiveOffers(filters) {
     if (filters.destination?.startsWith('id:')) params.destination_id = `eq.${filters.destination.slice(3)}`;
 
     const offers = await publicSupabaseRequest('pricing_offers', params);
+    const styleOptions = await fetchPublicBusinessOptions('pricing.trip_style');
+    const styleById = new Map(styleOptions.map((option) => [option.id, option]));
+    const enrichedOffers = offers.map((offer) => ({
+        ...offer,
+        tripStyleOption: styleById.get(offer.trip_style_value_id) || null
+    }));
     if (LEGACY_DESTINATION_VALUES.has(filters.destination) && filters.destination !== 'all') {
-        return offers.filter((offer) => {
+        return enrichedOffers.filter((offer) => {
             const destination = resultDestination(offer);
             return destination.category === filters.destination || destination.slug === filters.destination;
         });
     }
-    return offers;
+    return enrichedOffers;
 }
 
 function syncSearchLanguage(lang = document.documentElement.getAttribute('lang') || 'ar') {
@@ -199,6 +229,23 @@ function syncSearchLanguage(lang = document.documentElement.getAttribute('lang')
         const label = lang === 'en' ? option.dataset.labelEn : option.dataset.labelAr;
         if (label) option.textContent = label;
     });
+}
+
+async function populateDynamicStyles() {
+    const select = document.getElementById('searchStyleSelect');
+    if (!select) return;
+    const options = await fetchPublicBusinessOptions('pricing.trip_style');
+    const existingValues = new Set(Array.from(select.options).map((option) => option.value));
+    options.forEach((optionData) => {
+        if (!optionData.value_key || existingValues.has(optionData.value_key)) return;
+        const option = document.createElement('option');
+        option.value = optionData.value_key;
+        option.dataset.labelAr = optionData.label_ar || optionData.value_key;
+        option.dataset.labelEn = optionData.label_en || optionData.label_ar || optionData.value_key;
+        option.textContent = businessOptionLabel(optionData);
+        select.append(option);
+    });
+    syncSearchLanguage();
 }
 
 async function populateDynamicDestinations() {
@@ -256,6 +303,7 @@ async function handleTripSearch(e) {
 window.AmwajSyncSearchLanguage = syncSearchLanguage;
 document.addEventListener('DOMContentLoaded', () => {
     syncSearchLanguage();
+    populateDynamicStyles();
     populateDynamicDestinations();
 });
 window.AmwajLivePricingSearch = Object.freeze({ fetchLiveOffers, handleTripSearch });
