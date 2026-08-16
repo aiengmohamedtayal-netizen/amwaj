@@ -589,3 +589,34 @@ body.dark-mode .admin-copilot-context {
 @media (max-width: 480px) {
   .admin-copilot-context { margin-inline: .75rem; font-size: .72rem; }
 }
+
+
+/* Settings page: reference layout refinement */
+.settings-page-card { padding: clamp(1rem, 2vw, 1.35rem); }
+.settings-page-card-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .1rem .15rem .9rem; }
+.settings-business-list { display: grid; gap: .65rem; }
+.settings-business-row { display: grid; grid-template-columns: 3.2rem minmax(0, 1fr) auto; align-items: center; gap: 1rem; min-height: 6.35rem; padding: .8rem 1rem; background: rgba(255,255,255,.82); border: 1px solid rgba(15,23,42,.08); border-radius: 1rem; box-shadow: 0 2px 8px rgba(8,24,38,.025); transition: border-color var(--duration-fast) var(--ease-apple), box-shadow var(--duration-fast) var(--ease-apple), transform var(--duration-fast) var(--ease-apple); }
+.settings-row-icon { display: grid; place-items: center; width: 3rem; height: 3rem; color: #0874d1; background: #f0f8ff; border-radius: .8rem; font-size: 1.1rem; }
+.settings-row-main { min-width: 0; }
+.settings-row-main h4 { margin: 0; color: var(--color-text-dark); font-size: .98rem; }
+.settings-row-main > p { margin: .22rem 0 .48rem; color: var(--color-text-slate); font-size: .75rem; }
+.settings-business-summary { display: flex; flex-wrap: wrap; gap: .22rem 1.35rem; color: #334155; font-size: .76rem; line-height: 1.65; }
+.settings-business-summary span { min-width: 10rem; max-width: 100%; overflow-wrap: anywhere; }
+.settings-business-summary strong { color: #1e293b; font-weight: 800; }
+.settings-edit-button { min-width: 4.7rem; min-height: 2.5rem; padding-inline: .8rem; background: #fff; border-color: rgba(15,23,42,.12); box-shadow: 0 2px 5px rgba(8,24,38,.04); }
+.settings-edit-button:hover { color: var(--color-primary); border-color: rgba(0,153,216,.35); background: #f8fdff; }
+.settings-page-footer { display: flex; align-items: center; justify-content: space-between; gap: .8rem 1.2rem; margin-top: .8rem; padding: .75rem .9rem; color: #587080; background: #eefbff; border: 1px solid rgba(0,153,216,.08); border-radius: .75rem; font-size: .72rem; line-height: 1.6; }
+.settings-page-footer span { display: inline-flex; align-items: center; gap: .4rem; }
+.settings-page-footer i { color: var(--color-primary); }
+.page-head-icon { display: inline-grid; place-items: center; width: 2.25rem; height: 2.25rem; margin-inline-start: .55rem; color: #0874d1; background: #f0f8ff; border-radius: .7rem; font-size: 1rem; vertical-align: middle; }
+@media (hover: hover) and (pointer: fine) { .settings-business-row:hover { transform: translateY(-1px); border-color: rgba(0,153,216,.2); box-shadow: 0 .45rem 1rem rgba(8,24,38,.06); } }
+@media (max-width: 720px) {
+  .settings-business-row { grid-template-columns: 2.8rem minmax(0,1fr); align-items: start; padding: .85rem; }
+  .settings-row-icon { width: 2.7rem; height: 2.7rem; }
+  .settings-edit-button { grid-column: 1 / -1; justify-self: start; }
+  .settings-page-footer { align-items: flex-start; flex-direction: column; }
+}
+@media (max-width: 420px) {
+  .settings-business-summary { display: grid; gap: .2rem; }
+  .settings-business-summary span { min-width: 0; }
+}

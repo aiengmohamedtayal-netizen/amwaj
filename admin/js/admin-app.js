@@ -1150,6 +1150,14 @@
     social_links: { title: 'الروابط الرسمية', description: 'روابط القنوات والمنصات الرسمية للشركة.' }
   });
 
+  const SETTING_ICONS = Object.freeze({
+    company_identity: 'fa-building',
+    contact: 'fa-phone-volume',
+    location: 'fa-location-dot',
+    site_meta: 'fa-share-nodes',
+    social_links: 'fa-link'
+  });
+
   const SETTING_FIELD_LABELS = Object.freeze({
     name_ar: 'الاسم بالعربية', name_en: 'الاسم بالإنجليزية', founded_on: 'تاريخ التأسيس', chairman: 'رئيس مجلس الإدارة', chairman_ar: 'رئيس مجلس الإدارة بالعربية', chairman_en: 'رئيس مجلس الإدارة بالإنجليزية', etaa_member: 'عضو في ETAA', licence_number: 'رقم الترخيص', license_number: 'رقم الترخيص', licence_category: 'فئة الترخيص', license_category: 'فئة الترخيص', license_category_ar: 'فئة الترخيص بالعربية', license_category_en: 'فئة الترخيص بالإنجليزية', responsible_manager: 'المدير المسؤول', responsible_manager_ar: 'المدير المسؤول', responsible_manager_en: 'المدير المسؤول بالإنجليزية', email: 'البريد الإلكتروني', landline: 'الهاتف الأرضي', phone: 'رقم الهاتف', mobile_whatsapp: 'أرقام واتساب', address_ar: 'العنوان بالعربية', address_en: 'العنوان بالإنجليزية', city_ar: 'المدينة بالعربية', city_en: 'المدينة بالإنجليزية', latitude: 'خط العرض', longitude: 'خط الطول', map_embed_url: 'رابط تضمين الخريطة', title: 'عنوان ظهور الموقع', canonical_url: 'الرابط الأساسي للموقع', description_ar: 'الوصف بالعربية', website: 'الموقع الرسمي', facebook: 'فيسبوك', whatsapp: 'واتساب', etaa: 'رابط عضوية ETAA'
   });
@@ -1164,6 +1172,7 @@
 
   function settingLabel(key) { return SETTING_FIELD_LABELS[key] || key.replace(/[_-]+/g, ' '); }
   function settingPresentation(setting) { return SETTING_PRESENTATION[setting.setting_key] || { title: setting.setting_key.replace(/[_-]+/g, ' '), description: setting.is_public ? 'إعداد عام معروض في الموقع.' : 'إعداد إداري خاص.' }; }
+  function settingIcon(settingKey) { return SETTING_ICONS[settingKey] || 'fa-sliders'; }
   function settingSummary(value) { return Object.entries(value || {}).slice(0, 3).map(([key, item]) => `<span><strong>${escapeHtml(settingLabel(key))}:</strong> ${escapeHtml(Array.isArray(item) ? item.join('، ') : String(item ?? '—'))}</span>`).join(''); }
   function settingInputType(key, value) {
     if (typeof value === 'number') return 'number';
@@ -1311,9 +1320,12 @@
     try {
       const settings = await client.list('site_settings', { order: 'setting_key.asc' });
       state.collections.settings = settings;
-      const content = `${pageHeader('إعدادات الموقع', 'حدّث بيانات العمل من حقول واضحة، من دون التعامل مع JSON تقني.')}
-        <section class="panel"><div class="panel-head"><div><h3 class="panel-title">إعدادات العمل</h3><p class="panel-subtitle">كل تعديل يبقى في مصدر البيانات المركزي للموقع.</p></div><span class="badge badge-active"><i class="fa-solid fa-database"></i> مصدر مركزي</span></div>
-          ${settings.length ? `<div class="settings-business-grid">${settings.map((item) => { const presentation = settingPresentation(item); return `<article class="editor-card settings-business-card"><div class="panel-head"><div><h4 style="margin:0">${escapeHtml(presentation.title)}</h4><p class="panel-subtitle">${escapeHtml(presentation.description)}</p></div><button class="btn btn-small" data-action="edit-setting" data-key="${escapeHtml(item.setting_key)}"><i class="fa-solid fa-pen"></i> تعديل</button></div><div class="settings-business-summary">${settingSummary(item.value)}</div></article>`; }).join('')}</div>` : '<div class="empty-state"><div><i class="fa-solid fa-sliders"></i><h3>لا توجد إعدادات مسجلة</h3><p>لم يضف الموقع الحالي إعدادات قابلة للإدارة بعد.</p></div></div>'}
+      const latestUpdated = settings.reduce((latest, item) => item.updated_at && (!latest || new Date(item.updated_at) > new Date(latest)) ? item.updated_at : latest, null);
+      const content = `<header class="page-head settings-page-head"><div><h2><span class="page-head-icon" aria-hidden="true"><i class="fa-solid fa-gear"></i></span>إعدادات الموقع</h2><p>حفظ بيانات العمل من حقول واضحة، من دون التعامل مع JSON تقني.</p></div></header>
+        <section class="panel settings-page-card">
+          <div class="settings-page-card-head"><div><h3 class="panel-title">إعدادات العمل</h3><p class="panel-subtitle">كل تعديل يتم في مصدر البيانات المركزي للموقع.</p></div><span class="badge badge-active"><i class="fa-solid fa-database" aria-hidden="true"></i> مصدر مركزي</span></div>
+          ${settings.length ? `<div class="settings-business-list">${settings.map((item) => { const presentation = settingPresentation(item); return `<article class="settings-business-row"><span class="settings-row-icon" aria-hidden="true"><i class="fa-solid ${escapeHtml(settingIcon(item.setting_key))}"></i></span><div class="settings-row-main"><h4>${escapeHtml(presentation.title)}</h4><p>${escapeHtml(presentation.description)}</p><div class="settings-business-summary">${settingSummary(item.value)}</div></div><button class="btn settings-edit-button" type="button" data-action="edit-setting" data-key="${escapeHtml(item.setting_key)}"><i class="fa-solid fa-pen" aria-hidden="true"></i> تعديل</button></article>`; }).join('')}</div>` : '<div class="empty-state"><div><i class="fa-solid fa-sliders"></i><h3>لا توجد إعدادات مسجلة</h3><p>لم يضف الموقع الحالي إعدادات قابلة للإدارة بعد.</p></div></div>'}
+          ${settings.length ? `<div class="settings-page-footer"><span><i class="fa-regular fa-clock" aria-hidden="true"></i> آخر تحديث: ${escapeHtml(formatDate(latestUpdated))}</span><span><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> جميع التغييرات تحفظ تلقائياً في مصدر البيانات المركزي وتنعكس على الموقع العام.</span></div>` : ''}
         </section>`;
       app.innerHTML = layout(content);
     } catch (error) { app.innerHTML = layout(`${pageHeader('إعدادات الموقع', '')}${errorMarkup(error.message)}`); }
