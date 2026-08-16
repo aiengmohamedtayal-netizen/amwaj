@@ -76,10 +76,6 @@
     container.id = 'admin-copilot-root';
     container.className = 'admin-copilot';
     container.innerHTML = `
-      <button class="admin-copilot-launcher" type="button" data-copilot="toggle" aria-label="فتح مساعد أمواج الإداري" aria-expanded="false" aria-controls="admin-copilot-panel">
-        <span class="admin-copilot-launcher-icon"><i class="fa-solid fa-sparkles" aria-hidden="true"></i></span>
-        <span>مساعد أمواج</span>
-      </button>
       <section class="admin-copilot-panel" id="admin-copilot-panel" role="dialog" aria-modal="false" aria-label="مساعد أمواج الإداري" aria-hidden="true" tabindex="-1">
         <header class="admin-copilot-head">
           <div class="admin-copilot-title"><span class="admin-copilot-avatar"><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i></span><span><strong>مساعد أمواج الإداري</strong><small><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> GPT-5.6 Luna · متصل بالبيانات الحية</small></span></div>
@@ -435,16 +431,16 @@
   function setOpen(open, { focus = true } = {}) {
     state.open = Boolean(open);
     const panel = document.getElementById('admin-copilot-panel');
-    const launcher = document.querySelector('.admin-copilot-launcher');
-    if (!panel || !launcher) return;
+    const toggles = document.querySelectorAll('[data-copilot="toggle"]');
+    if (!panel) return;
     if (state.open) updateContextIndicator();
     panel.classList.toggle('is-open', state.open);
     panel.setAttribute('aria-hidden', String(!state.open));
-    launcher.setAttribute('aria-expanded', String(state.open));
+    toggles.forEach((toggle) => toggle.setAttribute('aria-expanded', String(state.open)));
     document.documentElement.classList.toggle('copilot-open', state.open);
     try { sessionStorage.setItem(storageKey, String(state.open)); } catch { /* no storage required */ }
     if (state.open && focus) window.setTimeout(() => input()?.focus(), 80);
-    if (!state.open && focus) launcher.focus();
+    if (!state.open && focus) toggles[0]?.focus();
   }
 
   function navigate(path) {
