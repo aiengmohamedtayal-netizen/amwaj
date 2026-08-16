@@ -103,6 +103,36 @@
     return session;
   }
 
+  async function updateProfile(fullName) {
+    const cleanName = String(fullName || '').normalize('NFKC').trim().replace(/\s+/g, ' ');
+    if (cleanName.length < 2) throw new Error('اكتب اسمًا صالحًا لا يقل عن حرفين.');
+    if (cleanName.length > 120) throw new Error('الاسم طويل جدًا.');
+    const session = await getValidSession();
+    const userId = session?.user?.id;
+    if (!session?.access_token || !userId) throw new Error('انتهت جلسة المدير. سجّل الدخول من جديد.');
+    const rows = await rest(`profiles?id=eq.${encodeURIComponent(userId)}`, {
+      method: 'PATCH',
+      headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({ full_name: cleanName })
+    });
+    return Array.isArray(rows) ? rows[0] || null : rows;
+  }
+
+  async function updateAvatar(avatarUrl) {
+    const cleanUrl = String(avatarUrl || '').trim();
+    if (cleanUrl && !/^https?:\/\//i.test(cleanUrl)) throw new Error('رابط الصورة غير صالح.');
+    const session = await getValidSession();
+    if (!session?.access_token) throw new Error('انتهت جلسة المدير. سجّل الدخول من جديد.');
+    const updatedUser = await authRequest('/user', {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({ data: { ...(session.user?.user_metadata || {}), avatar_url: cleanUrl } })
+    });
+    const user = updatedUser?.user || updatedUser;
+    if (user?.id) saveSession({ ...session, user: { ...session.user, ...user } });
+    return user;
+  }
+
   async function updatePassword(password) {
     const cleanPassword = String(password || '');
     if (cleanPassword.length < 12) throw new Error('استخدم كلمة مرور لا تقل عن 12 حرفًا.');
@@ -277,6 +307,8 @@
     signInWithPassword,
     captureEmailLinkSession,
     updatePassword,
+    updateProfile,
+    updateAvatar,
     signOut,
     requireAdmin,
     list,

@@ -12,7 +12,8 @@
     pricing: { title: 'جدول أسعار محرك البحث', subtitle: 'أدخل واعتمد عروض الرحلات الحية التي تظهر في محرك البحث العام.' },
     blog: { title: 'إدارة المدونة', subtitle: 'حرّر المقالات العربية والإنجليزية ثم راجعها وانشرها بأمان.' },
     reviews: { title: 'آراء العملاء', subtitle: 'راجع آراء الزوار واعتمد الموثوق منها قبل ظهورها في الموقع العام.' },
-    settings: { title: 'إعدادات الموقع', subtitle: 'مراجعة وتحديث الإعدادات المسجلة في مصدر البيانات المركزي.' }
+    settings: { title: 'إعدادات الموقع', subtitle: 'مراجعة وتحديث الإعدادات المسجلة في مصدر البيانات المركزي.' },
+    account: { title: 'حساب الأدمن', subtitle: 'إدارة بيانات الحساب والأمان والجلسات.' }
   };
   const serviceIconOptions = [
     ['fa-concierge-bell', 'خدمات سياحية عامة'],
@@ -34,6 +35,15 @@
     ['fa-shield-halved', 'حماية وتأمين'],
     ['fa-earth-americas', 'سياحة دولية']
   ];
+
+  const accountAvatarOptions = Object.freeze([
+    { url: '/admin/assets/avatars/avatar-01-reader.png', label: 'قارئ هادئ' },
+    { url: '/admin/assets/avatars/avatar-02-manager.png', label: 'مدير' },
+    { url: '/admin/assets/avatars/avatar-03-traveler.png', label: 'مسافر' },
+    { url: '/admin/assets/avatars/avatar-04-guide.png', label: 'مرشد سياحي' },
+    { url: '/admin/assets/avatars/avatar-05-creative.png', label: 'مبدع' },
+    { url: '/admin/assets/avatars/avatar-06-support.png', label: 'دعم' }
+  ]);
 
   const collectionMeta = {
     packages: {
@@ -174,10 +184,11 @@
   function layout(content) {
     const profile = state.auth.profile || {};
     const pageLabel = routeLabels[state.page];
+    const avatarUrl = safeUrl(state.auth.session?.user?.user_metadata?.avatar_url || '');
     const links = [
       ['dashboard', 'fa-chart-pie', 'لوحة التحكم'], ['packages', 'fa-suitcase-rolling', 'البرامج'],
       ['destinations', 'fa-map-location-dot', 'الوجهات'], ['services', 'fa-concierge-bell', 'الخدمات'],
-      ['pricing', 'fa-tags', 'التسعير'], ['blog', 'fa-newspaper', 'المدونة'], ['reviews', 'fa-star-half-stroke', 'آراء العملاء'], ['settings', 'fa-sliders', 'الإعدادات']
+      ['pricing', 'fa-tags', 'التسعير'], ['blog', 'fa-newspaper', 'المدونة'], ['reviews', 'fa-star-half-stroke', 'آراء العملاء'], ['settings', 'fa-sliders', 'الإعدادات'], ['account', 'fa-user-gear', 'حساب الأدمن']
     ];
     return `<div class="admin-shell">
       <aside class="sidebar" id="admin-sidebar" aria-label="التنقل الإداري" aria-hidden="false">
@@ -192,12 +203,13 @@
           ${links.map(([key, icon, label]) => `<a class="nav-link ${state.page === key ? 'is-active' : ''}" href="${adminPath(key)}" data-action="navigate" ${state.page === key ? 'aria-current="page"' : ''}><i class="nav-icon fa-solid ${icon}" aria-hidden="true"></i><span class="nav-label">${label}</span><i class="nav-link-arrow fa-solid fa-chevron-left" aria-hidden="true"></i></a>`).join('')}
         </nav>
         <div class="sidebar-footer">
-          <div class="sidebar-user-card">
-            <span class="sidebar-user-avatar"><i class="fa-solid fa-user" aria-hidden="true"></i><b aria-hidden="true"></b></span>
+          <a class="sidebar-user-card sidebar-user-card-link" href="${adminPath('account')}" data-action="navigate" aria-label="فتح إعدادات حساب الأدمن">
+            <span class="sidebar-user-avatar">${avatarUrl ? `<img src="${escapeHtml(avatarUrl)}" alt="صورة الحساب" loading="lazy" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><i class="fa-solid fa-user" aria-hidden="true" hidden></i>` : '<i class="fa-solid fa-user" aria-hidden="true"></i>'}<b aria-hidden="true"></b></span>
             <span class="sidebar-user-copy"><strong title="${escapeHtml(profile.full_name || state.auth.session?.user?.email || '')}">${escapeHtml(profile.full_name || 'Amwaj Travel Administrator')}</strong><small>مدير النظام</small></span>
             <span class="sidebar-user-menu" aria-hidden="true"><i class="fa-solid fa-ellipsis-vertical"></i></span>
-          </div>
-          <button class="sidebar-signout btn btn-ghost" type="button" data-action="sign-out"><i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i> تسجيل الخروج</button>
+                    </a>
+          <button class="sidebar-signout btn btn-ghost" type="button" data-action="sign-out">
+<i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i> تسجيل الخروج</button>
           <button class="sidebar-assistant-card" type="button" data-copilot="toggle" aria-label="فتح مساعد أمواج الإداري">
             <span class="sidebar-assistant-copy"><strong>مساعد أمواج</strong><small>خدمتك في أي وقت</small></span>
             <span class="sidebar-assistant-icon"><i class="fa-solid fa-message" aria-hidden="true"></i></span>
@@ -1175,6 +1187,112 @@
     return `<div class="field ${long ? 'full' : ''}"><label for="${id}">${escapeHtml(label)}</label>${long ? `<textarea id="${id}" class="textarea" data-setting-field="${escapeHtml(key)}">${escapeHtml(normalized)}</textarea>` : `<input id="${id}" class="input" type="${settingInputType(key, value)}" data-setting-field="${escapeHtml(key)}" value="${escapeHtml(normalized)}" ${typeof value === 'number' ? 'step="any"' : ''}>`}${isArray ? '<span class="field-hint">افصل القيم بفاصلة.</span>' : ''}</div>`;
   }
 
+  function accountAvatarMarkup(url, alt, className = '') {
+    const cleanUrl = safeUrl(url);
+    return cleanUrl
+      ? `<img class="${className}" src="${escapeHtml(cleanUrl)}" alt="${escapeHtml(alt || 'صورة الحساب')}" loading="lazy" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><i class="fa-solid fa-user" aria-hidden="true" hidden></i>`
+      : `<i class="fa-solid fa-user" aria-hidden="true"></i>`;
+  }
+
+  async function renderAccountPage() {
+    const user = state.auth.session?.user || {};
+    const currentAvatar = safeUrl(user.user_metadata?.avatar_url || '');
+    const currentName = state.auth.profile?.full_name || user.user_metadata?.full_name || '';
+    const avatarOptions = accountAvatarOptions.map((avatar) => `<button class="avatar-option ${currentAvatar === avatar.url ? 'is-selected' : ''}" type="button" data-action="select-avatar" data-avatar-url="${escapeHtml(avatar.url)}" aria-label="اختيار ${escapeHtml(avatar.label)}" aria-pressed="${String(currentAvatar === avatar.url)}"><span class="avatar-option-image">${accountAvatarMarkup(avatar.url, avatar.label)}</span><span>${escapeHtml(avatar.label)}</span></button>`).join('');
+    const content = `${pageHeader('حساب الأدمن', 'حدّث بيانات حسابك وصورتك الشخصية من مكان واحد، مع الحفاظ على صلاحياتك الحالية.')}
+      <div class="account-page">
+        <section class="panel account-card account-avatar-card">
+          <div class="panel-head"><div><h3 class="panel-title">الصورة الشخصية</h3><p class="panel-subtitle">اختر رسماً جاهزاً بأسلوب بسيط أو ارفع صورة من جهازك.</p></div><i class="fa-solid fa-image account-section-icon" aria-hidden="true"></i></div>
+          <div class="account-avatar-editor">
+            <div class="avatar-preview" data-account-avatar-preview>${accountAvatarMarkup(currentAvatar, 'صورة الحساب')}</div>
+            <div class="avatar-upload-copy"><strong>صورتك الحالية</strong><span class="muted">تظهر الصورة المختارة أيضاً في بطاقة المستخدم داخل القائمة الجانبية.</span><input id="account-avatar-file" class="sr-only" type="file" accept="image/jpeg,image/png,image/webp,image/avif"><button class="btn btn-primary" type="button" data-action="upload-avatar"><i class="fa-solid fa-cloud-arrow-up" aria-hidden="true"></i> رفع صورة</button></div>
+          </div>
+          <div class="avatar-picker-head"><div><h4>اختر Avatar جاهزاً</h4><p class="muted">يمكنك تغيير الاختيار في أي وقت.</p></div><span class="badge badge-draft">6 خيارات</span></div>
+          <div class="avatar-grid" role="list" aria-label="Avatars جاهزة">${avatarOptions}</div>
+        </section>
+        <section class="panel account-card">
+          <div class="panel-head"><div><h3 class="panel-title">بيانات الحساب</h3><p class="panel-subtitle">الاسم المعروض في لوحة الإدارة. لا يمكن تغيير البريد من هذه الصفحة.</p></div><i class="fa-solid fa-id-card account-section-icon" aria-hidden="true"></i></div>
+          <form id="account-profile-form" class="form-grid" novalidate><div class="field full"><label for="account-full-name">الاسم الكامل</label><input id="account-full-name" name="full_name" class="input" value="${escapeHtml(currentName)}" minlength="2" maxlength="120" required autocomplete="name"></div><div class="field full"><label for="account-email">البريد الإلكتروني</label><input id="account-email" class="input" value="${escapeHtml(user.email || '')}" readonly aria-readonly="true" dir="ltr"></div><div class="full account-form-actions"><button class="btn btn-primary" type="button" data-action="save-profile"><i class="fa-solid fa-floppy-disk" aria-hidden="true"></i> حفظ الاسم</button></div></form>
+        </section>
+        <section class="panel account-card">
+          <div class="panel-head"><div><h3 class="panel-title">الأمان وكلمة المرور</h3><p class="panel-subtitle">استخدم كلمة مرور جديدة لا تقل عن 12 حرفاً.</p></div><i class="fa-solid fa-shield-halved account-section-icon" aria-hidden="true"></i></div>
+          <form id="account-password-form" class="form-grid" novalidate><div class="field"><label for="account-password">كلمة المرور الجديدة</label><input id="account-password" name="password" class="input" type="password" minlength="12" required autocomplete="new-password"></div><div class="field"><label for="account-password-confirm">تأكيد كلمة المرور</label><input id="account-password-confirm" name="password_confirm" class="input" type="password" minlength="12" required autocomplete="new-password"></div><div class="full account-form-actions"><button class="btn btn-primary" type="button" data-action="change-password"><i class="fa-solid fa-key" aria-hidden="true"></i> تغيير كلمة المرور</button></div></form>
+        </section>
+      </div>`;
+    app.innerHTML = layout(content);
+  }
+
+  async function saveProfile(button) {
+    const form = document.getElementById('account-profile-form');
+    const input = form?.querySelector('[name="full_name"]');
+    if (!form || !input || !form.reportValidity()) return;
+    setButtonBusy(button, true);
+    try {
+      const profile = await client.updateProfile(input.value);
+      state.auth.profile = { ...(state.auth.profile || {}), ...(profile || {}), full_name: profile?.full_name || input.value.trim() };
+      showToast('success', 'تم حفظ الاسم', 'تم تحديث بيانات حساب الأدمن.');
+      await renderAccountPage();
+    } catch (error) {
+      showToast('error', 'تعذر حفظ الاسم', error.message);
+      setButtonBusy(button, false);
+    }
+  }
+
+  async function changePassword(button) {
+    const form = document.getElementById('account-password-form');
+    const password = form?.querySelector('[name="password"]')?.value || '';
+    const confirmation = form?.querySelector('[name="password_confirm"]')?.value || '';
+    if (!form || !form.reportValidity()) return;
+    if (password !== confirmation) { showToast('error', 'كلمتا المرور غير متطابقتين', 'اكتب كلمة المرور نفسها في الحقلين.'); return; }
+    setButtonBusy(button, true);
+    try {
+      await client.updatePassword(password);
+      form.reset();
+      showToast('success', 'تم تغيير كلمة المرور', 'سيتم استخدام كلمة المرور الجديدة في تسجيل الدخول القادم.');
+      setButtonBusy(button, false);
+    } catch (error) {
+      showToast('error', 'تعذر تغيير كلمة المرور', error.message);
+      setButtonBusy(button, false);
+    }
+  }
+
+  async function selectAvatar(button) {
+    const avatarUrl = safeUrl(button.dataset.avatarUrl);
+    if (!avatarUrl) return;
+    setButtonBusy(button, true);
+    try {
+      await client.updateAvatar(avatarUrl);
+      state.auth.session = await client.getValidSession();
+      showToast('success', 'تم تحديث الصورة', 'تم ربط الـAvatar ببطاقة المستخدم في القائمة الجانبية.');
+      await renderAccountPage();
+    } catch (error) {
+      showToast('error', 'تعذر حفظ الصورة', error.message);
+      setButtonBusy(button, false);
+    }
+  }
+
+  async function uploadAvatar(target) {
+    const input = target?.matches?.('#account-avatar-file') ? target : document.getElementById('account-avatar-file');
+    if (!input) return;
+    if (target !== input) { input.click(); return; }
+    const file = input.files?.[0];
+    if (!file) return;
+    const button = document.querySelector('[data-action="upload-avatar"]');
+    setButtonBusy(button, true);
+    try {
+      const upload = await client.uploadImage(file, 'admin-avatar');
+      await client.updateAvatar(upload.publicUrl);
+      state.auth.session = await client.getValidSession();
+      showToast('success', 'تم رفع الصورة', 'تم حفظ صورة الحساب وتحديث بطاقة المستخدم.');
+      await renderAccountPage();
+    } catch (error) {
+      showToast('error', 'تعذر رفع الصورة', error.message);
+      setButtonBusy(button, false);
+    } finally {
+      input.value = '';
+    }
+  }
+
   async function renderSettings() {
     app.innerHTML = layout(`${pageHeader('إعدادات الموقع', 'حدّث بيانات العمل من حقول واضحة، من دون التعامل مع JSON تقني.')}${loadingMarkup('جارٍ تحميل الإعدادات…')}`);
     try {
@@ -1476,6 +1594,7 @@
     else if (state.page === 'blog') await renderBlog();
     else if (state.page === 'reviews') await renderReviews();
     else if (state.page === 'settings') await renderSettings();
+    else if (state.page === 'account') await renderAccountPage();
     else await renderDashboard();
     syncMobileNavState(false);
     applyTableAffordances();
@@ -1529,6 +1648,10 @@
     if (action === 'save-offer-editor') saveOfferEditor(target);
     if (action === 'edit-setting') { const row = (state.collections.settings || []).find((item) => item.setting_key === target.dataset.key); if (row) openSettingEditor(row); }
     if (action === 'save-setting') saveSetting(target);
+    if (action === 'save-profile') saveProfile(target);
+    if (action === 'change-password') changePassword(target);
+    if (action === 'select-avatar') selectAvatar(target);
+    if (action === 'upload-avatar') uploadAvatar(target);
     if (action === 'new-blog') openBlogEditor(null);
     if (action === 'edit-blog') { const post = (state.blog?.posts || []).find((item) => item.id === target.dataset.id); if (post) openBlogEditor(post); }
     if (action === 'preview-blog') { const post = (state.blog?.posts || []).find((item) => item.id === target.dataset.id); if (post) openBlogPreview(post); }
@@ -1559,6 +1682,9 @@
   }
 
   document.addEventListener('click', (event) => { handleAction(event); });
+  document.addEventListener('change', (event) => {
+    if (event.target?.id === 'account-avatar-file') uploadAvatar(event.target);
+  });
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && document.getElementById('admin-sidebar')?.classList.contains('is-open')) closeMobileNav({ restoreFocus: true });
   });
