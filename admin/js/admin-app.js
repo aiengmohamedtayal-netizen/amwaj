@@ -241,7 +241,7 @@
   }
 
   async function renderDashboard() {
-    app.innerHTML = layout(loadingMarkup('جارٍ تحميل ملخص المحتوى…'));
+    app.innerHTML = layout(loadingMarkup('جارٍ تحميل لوحة التحكم…'));
     try {
       const [packages, destinations, services] = await Promise.all([
         client.list('packages', { order: 'sort_order.asc,updated_at.desc' }),
@@ -252,23 +252,38 @@
       const all = [...packages, ...destinations, ...services];
       const published = all.filter((row) => row.status === 'published' && row.is_active).length;
       const drafts = all.filter((row) => row.status === 'draft' && row.is_active).length;
-      const updated = [...all].sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at)).slice(0, 6);
-      const metric = (icon, tint, color, label, value) => `<article class="metric-card" style="--metric-tint:${tint};--metric-color:${color}"><div class="metric-icon"><i class="fa-solid ${icon}"></i></div><p class="metric-label">${label}</p><p class="metric-value">${value}</p></article>`;
-      const greeting = `مرحبًا، ${state.auth.profile?.full_name ? state.auth.profile.full_name : 'مدير أمواج'}`;
-      const content = `${pageHeader(greeting, 'أدِر المحتوى والتسعير من مصدر البيانات المركزي دون تغيير الواجهة العامة.')}
-        <section class="metrics" aria-label="ملخص المحتوى">
-          ${metric('fa-suitcase-rolling', 'rgba(0,153,216,.12)', '#0099D8', 'البرامج', packages.length)}
-          ${metric('fa-map-location-dot', 'rgba(0,194,168,.13)', '#00A38D', 'الوجهات', destinations.length)}
-          ${metric('fa-concierge-bell', 'rgba(253,186,33,.18)', '#A76B00', 'الخدمات', services.length)}
-          ${metric('fa-file-pen', 'rgba(100,116,139,.13)', '#475569', 'مسودات قيد المراجعة', drafts)}
+      const inactive = all.filter((row) => !row.is_active).length;
+      const total = all.length;
+      const updated = [...all].sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at)).slice(0, 5);
+      const publishedPercent = total ? Math.round((published / total) * 100) : 0;
+      const draftPercent = total ? Math.round((drafts / total) * 100) : 0;
+      const metric = (icon, tone, label, value, note) => `<article class="dashboard-stat dashboard-stat-${tone}"><div class="dashboard-stat-icon"><i class="fa-solid ${icon}" aria-hidden="true"></i></div><div class="dashboard-stat-copy"><p>${label}</p><strong>${value}</strong><small>${note}</small></div><span class="dashboard-stat-wave" aria-hidden="true"></span></article>`;
+      const contentType = (label, value, icon, tone) => `<div class="dashboard-type-row"><span class="dashboard-type-icon dashboard-tone-${tone}"><i class="fa-solid ${icon}" aria-hidden="true"></i></span><span>${label}</span><strong>${value}</strong></div>`;
+      const greetingName = state.auth.profile?.full_name || 'مدير أمواج';
+      const greeting = `<div class="dashboard-welcome"><p class="dashboard-eyebrow"><i class="fa-solid fa-sparkles" aria-hidden="true"></i> مساحة الإدارة</p><h2>مرحبًا، ${escapeHtml(greetingName)}</h2><p>أنت الآن في لوحة التحكم الرئيسية لمصدر البيانات المركزي.</p></div>`;
+      const distributionStyle = total ? `--published:${publishedPercent}%;--drafts:${draftPercent}%;--inactive:${Math.max(0, 100 - publishedPercent - draftPercent)}%` : '--published:0%;--drafts:0%;--inactive:100%';
+      const content = `<section class="dashboard-head"><div>${greeting}</div><div class="dashboard-head-tools"><label class="dashboard-search"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><input type="search" placeholder="ابحث في المحتوى…" aria-label="البحث في المحتوى" data-dashboard-search></label><span class="dashboard-sync"><i class="fa-solid fa-rotate" aria-hidden="true"></i> بيانات مباشرة</span></div></section>
+        <section class="dashboard-stats" aria-label="إحصائيات المحتوى">
+          ${metric('fa-suitcase-rolling', 'blue', 'البرامج', packages.length, 'إجمالي البرامج')}
+          ${metric('fa-map-location-dot', 'teal', 'الوجهات', destinations.length, 'إجمالي الوجهات')}
+          ${metric('fa-concierge-bell', 'gold', 'الخدمات', services.length, 'إجمالي الخدمات')}
+          ${metric('fa-file-pen', 'violet', 'مسودات قيد المراجعة', drafts, `${published} منشور · ${inactive} غير نشط`)}
         </section>
-        <section class="panel"><div class="panel-head"><div><h3 class="panel-title">إجراءات سريعة</h3><p class="panel-subtitle">أنشئ عنصرًا جديدًا أو راجع حالة النشر الحالية.</p></div><span class="badge badge-active"><i class="fa-solid fa-circle"></i> ${published} عنصر منشور</span></div>
-          <div class="quick-actions"><button class="btn btn-primary" data-action="new-item" data-kind="packages"><i class="fa-solid fa-plus"></i> إضافة برنامج</button><button class="btn" data-action="new-item" data-kind="destinations"><i class="fa-solid fa-plus"></i> إضافة وجهة</button><button class="btn" data-action="new-item" data-kind="services"><i class="fa-solid fa-plus"></i> إضافة خدمة</button><a class="btn" href="/admin/pricing/"><i class="fa-solid fa-tags"></i> مراجعة التسعير</a><a class="btn" href="/admin/blog/"><i class="fa-solid fa-newspaper"></i> إدارة المدونة</a></div>
+        <section class="dashboard-grid dashboard-grid-main">
+          <article class="dashboard-card dashboard-actions-card"><div class="dashboard-card-head"><div><h3>إجراءات سريعة</h3><p>أنشئ عنصرًا أو انتقل مباشرة إلى أدوات الإدارة.</p></div><i class="fa-solid fa-bolt dashboard-head-icon" aria-hidden="true"></i></div><div class="dashboard-actions"><button class="dashboard-action dashboard-action-primary" data-action="new-item" data-kind="packages"><i class="fa-solid fa-plus"></i><span>إضافة برنامج</span></button><button class="dashboard-action" data-action="new-item" data-kind="destinations"><i class="fa-solid fa-plus"></i><span>إضافة وجهة</span></button><button class="dashboard-action" data-action="new-item" data-kind="services"><i class="fa-solid fa-plus"></i><span>إضافة خدمة</span></button><a class="dashboard-action" href="/admin/pricing/"><i class="fa-solid fa-tags"></i><span>مراجعة التسعير</span></a><a class="dashboard-action" href="/admin/blog/"><i class="fa-solid fa-newspaper"></i><span>إدارة المدونة</span></a><a class="dashboard-action" href="/admin/reviews/"><i class="fa-solid fa-star"></i><span>مراجعة الآراء</span></a></div></article>
+          <article class="dashboard-card dashboard-overview-card"><div class="dashboard-card-head"><div><h3>نظرة عامة على المحتوى</h3><p>توزيع المحتوى الحالي حسب النوع والحالة.</p></div><span class="dashboard-period"><i class="fa-regular fa-calendar" aria-hidden="true"></i> الآن</span></div><div class="dashboard-overview-body"><div class="dashboard-donut" style="${distributionStyle}" aria-label="إجمالي المحتوى ${total}"><div><strong>${total}</strong><span>عنصر</span></div></div><div class="dashboard-types">${contentType('البرامج', packages.length, 'fa-suitcase-rolling', 'blue')}${contentType('الوجهات', destinations.length, 'fa-map-location-dot', 'teal')}${contentType('الخدمات', services.length, 'fa-concierge-bell', 'gold')}${contentType('مسودات', drafts, 'fa-file-pen', 'violet')}</div></div><div class="dashboard-progress"><span><b>منشور</b> ${publishedPercent}%</span><span><b>مسودة</b> ${draftPercent}%</span><span><b>غير نشط</b> ${Math.max(0, 100 - publishedPercent - draftPercent)}%</span></div></article>
         </section>
-        <section class="panel"><div class="panel-head"><div><h3 class="panel-title">آخر التحديثات</h3><p class="panel-subtitle">أحدث تغييرات المحتوى المسجلة في Supabase.</p></div></div>
-          ${updated.length ? `<ul class="recent-list">${updated.map((item) => `<li><div><strong>${escapeHtml(item.title_ar)}</strong><time>آخر تحديث: ${formatDate(item.updated_at)}</time></div>${statusMarkup(item)}</li>`).join('')}</ul>` : '<div class="empty-state"><div><i class="fa-solid fa-folder-open"></i><h3>لا توجد عناصر بعد</h3><p>أضف برنامجًا أو وجهة أو خدمة لبدء إدارة المحتوى.</p></div></div>'}
-        </section>`;
+        <section class="dashboard-grid dashboard-grid-bottom"><article class="dashboard-card dashboard-updates-card"><div class="dashboard-card-head"><div><h3>آخر التحديثات</h3><p>أحدث تغييرات المحتوى المسجلة في مصدر البيانات المركزي.</p></div><i class="fa-solid fa-clock-rotate-left dashboard-head-icon" aria-hidden="true"></i></div>${updated.length ? `<ul class="dashboard-update-list">${updated.map((item) => `<li><span class="dashboard-update-icon"><i class="fa-solid ${item.type === 'published' ? 'fa-circle-check' : item.type === 'draft' ? 'fa-pen' : 'fa-layer-group'}" aria-hidden="true"></i></span><div><strong>${escapeHtml(item.title_ar || item.title_en || 'عنصر بدون عنوان')}</strong><small>${formatDate(item.updated_at)}</small></div>${statusMarkup(item)}</li>`).join('')}</ul>` : '<div class="dashboard-empty"><i class="fa-solid fa-folder-open"></i><p>لا توجد تحديثات بعد.</p></div>'}</article><article class="dashboard-card dashboard-activity-card"><div class="dashboard-card-head"><div><h3>نشاط النشر</h3><p>ملخص حالة المحتوى الحالية.</p></div><i class="fa-solid fa-chart-line dashboard-head-icon" aria-hidden="true"></i></div><div class="dashboard-activity-list"><div><span>منشور حاليًا</span><strong>${published}</strong><b class="activity-bar activity-bar-blue" style="--bar:${publishedPercent}%"></b></div><div><span>مسودات للمراجعة</span><strong>${drafts}</strong><b class="activity-bar activity-bar-violet" style="--bar:${draftPercent}%"></b></div><div><span>غير نشط / مؤرشف</span><strong>${inactive}</strong><b class="activity-bar activity-bar-gold" style="--bar:${Math.max(0, 100 - publishedPercent - draftPercent)}%"></b></div></div><a class="dashboard-see-all" href="/admin/packages/">عرض إدارة المحتوى <i class="fa-solid fa-arrow-left" aria-hidden="true"></i></a></article></section>`;
       app.innerHTML = layout(content);
+      document.querySelector('[data-dashboard-search]')?.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter') return;
+        const query = event.currentTarget.value.trim();
+        if (!query) return;
+        const normalizedQuery = query.toLowerCase();
+        const target = Object.entries(state.collections).find(([kind, rows]) => rows.some((row) => `${row.title_ar || ''} ${row.title_en || ''}`.toLowerCase().includes(normalizedQuery)));
+        state.search = query;
+        window.location.href = target ? adminPath(target[0]) : adminPath('packages');
+      });
     } catch (error) {
       app.innerHTML = layout(errorMarkup(error.message));
     }
