@@ -46,9 +46,9 @@ a { color: inherit; }
 .sidebar-assistant-copy strong { font-size: 1.05rem; }
 .sidebar-assistant-copy small { margin-top: .3rem; color: rgba(218,229,255,.66); font-size: .78rem; }
 .sidebar-assistant-icon { display: inline-flex; align-items: center; justify-content: center; width: 3.2rem; height: 3.2rem; flex: 0 0 auto; color: #bfe8ff; background: linear-gradient(145deg, #3668d8, #2947a7); border: 1px solid rgba(174,221,255,.2); border-radius: .9rem; font-size: 1.35rem; }
-.developer-credit { display: flex; flex-direction: column; align-items: center; gap: .2rem; width: 100%; margin: 1.25rem 0 0; padding-top: .9rem; color: rgba(190,225,238,.54); border-top: 1px solid rgba(255,255,255,.08); font: 600 .64rem/1.45 var(--font-english); letter-spacing: .045em; text-align: center; }
-.developer-credit i { color: #63caff; font-size: .85rem; }
-.developer-credit strong { color: #61c9f0; font-size: .72rem; }
+.developer-credit { display: flex; flex-direction: column; align-items: center; gap: .2rem; width: 100%; margin: 1.25rem 0 0; padding-top: .9rem; color: rgba(255,255,255,.58); border-top: 1px solid rgba(255,255,255,.08); font: 600 .64rem/1.45 var(--font-english); letter-spacing: .045em; text-align: center; }
+.developer-credit i { color: rgba(255,255,255,.72); font-size: .85rem; }
+.developer-credit strong { color: rgba(255,255,255,.78); font-size: .72rem; }
 
 .main-area { min-width: 0; }
 .topbar { min-height: 4.75rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .75rem clamp(1rem, 3vw, 2.5rem); background: rgba(255,255,255,.79); border-bottom: 1px solid rgba(15,23,42,.08); backdrop-filter: blur(16px) saturate(150%); position: sticky; top: 0; z-index: 20; }
