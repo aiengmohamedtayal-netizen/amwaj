@@ -1503,7 +1503,11 @@
     const target = event.target.closest('[data-action]');
     if (!target) return;
     const action = target.dataset.action;
-    if (action === 'toggle-nav') toggleMobileNav();
+    if (action === 'toggle-nav') {
+      event.preventDefault();
+      toggleMobileNav();
+      return;
+    }
     if (action === 'close-nav' || action === 'navigate') closeMobileNav();
     if (action === 'reload-page') renderPage();
     if (action === 'export-pdf') { window.print(); }
