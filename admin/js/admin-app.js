@@ -1546,13 +1546,15 @@
 
   function syncMobileNavState(isOpen) {
     const sidebar = document.getElementById('admin-sidebar');
+    const shell = document.querySelector('.admin-shell');
     const toggle = document.querySelector('[data-action="toggle-nav"]');
     const compact = isCompactAdminViewport();
-    if (sidebar) sidebar.setAttribute('aria-hidden', String(compact && !isOpen));
+    if (sidebar) sidebar.setAttribute('aria-hidden', String(compact ? !isOpen : false));
+    if (shell) shell.classList.toggle('sidebar-collapsed', !compact && !isOpen);
     if (toggle) {
-      toggle.setAttribute('aria-expanded', String(compact && isOpen));
-      toggle.setAttribute('aria-label', compact && isOpen ? 'إغلاق القائمة' : 'فتح القائمة');
-      toggle.classList.toggle('is-open', compact && isOpen);
+      toggle.setAttribute('aria-expanded', String(isOpen));
+      toggle.setAttribute('aria-label', isOpen ? 'إغلاق القائمة' : 'فتح القائمة');
+      toggle.classList.toggle('is-open', isOpen);
     }
   }
 
@@ -1627,18 +1629,21 @@
   }
 
   function closeMobileNav({ restoreFocus = false } = {}) {
-    document.getElementById('admin-sidebar')?.classList.remove('is-open');
+    const sidebar = document.getElementById('admin-sidebar');
+    sidebar?.classList.remove('is-open');
     document.body.classList.remove('admin-nav-open');
     syncMobileNavState(false);
-    if (restoreFocus && isCompactAdminViewport()) document.querySelector('[data-action="toggle-nav"]')?.focus({ preventScroll: true });
+    if (restoreFocus) document.querySelector('[data-action="toggle-nav"]')?.focus({ preventScroll: true });
   }
 
   function toggleMobileNav() {
     const sidebar = document.getElementById('admin-sidebar');
-    if (!sidebar || !isCompactAdminViewport()) return;
-    const nextState = !sidebar.classList.contains('is-open');
-    sidebar.classList.toggle('is-open', nextState);
-    document.body.classList.toggle('admin-nav-open', nextState);
+    if (!sidebar) return;
+    const compact = isCompactAdminViewport();
+    const nextState = compact ? !sidebar.classList.contains('is-open') : sidebar.classList.contains('sidebar-is-hidden');
+    if (compact) sidebar.classList.toggle('is-open', nextState);
+    sidebar.classList.toggle('sidebar-is-hidden', !compact && !nextState);
+    document.body.classList.toggle('admin-nav-open', compact && nextState);
     syncMobileNavState(nextState);
     if (nextState) window.requestAnimationFrame(() => sidebar.querySelector('.nav-link.is-active, .nav-link')?.focus());
   }

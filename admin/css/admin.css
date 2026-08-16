@@ -620,3 +620,23 @@ body.dark-mode .admin-copilot-context {
   .settings-business-summary { display: grid; gap: .2rem; }
   .settings-business-summary span { min-width: 0; }
 }
+
+/* Topbar navigation toggle: supports both the mobile drawer and desktop collapse. */
+@media (min-width: 1024px) {
+  .mobile-nav-toggle { display: inline-flex; flex: 0 0 auto; }
+  .admin-shell { transition: grid-template-columns var(--duration-normal) var(--ease-apple); }
+  .admin-shell.sidebar-collapsed { grid-template-columns: 0 minmax(0, 1fr); }
+  .admin-shell.sidebar-collapsed .sidebar {
+    min-width: 0;
+    width: 0;
+    padding-inline: 0;
+    overflow: hidden;
+    opacity: 0;
+    pointer-events: none;
+    transform: translate3d(105%, 0, 0);
+    border-inline-width: 0;
+    box-shadow: none;
+  }
+  html:not([dir='rtl']) .admin-shell.sidebar-collapsed .sidebar { transform: translate3d(-105%, 0, 0); }
+}
+.sidebar-backdrop { cursor: pointer; }
