@@ -203,11 +203,11 @@
           ${links.map(([key, icon, label]) => `<a class="nav-link ${state.page === key ? 'is-active' : ''}" href="${adminPath(key)}" data-action="navigate" ${state.page === key ? 'aria-current="page"' : ''}><i class="nav-icon fa-solid ${icon}" aria-hidden="true"></i><span class="nav-label">${label}</span><i class="nav-link-arrow fa-solid fa-chevron-left" aria-hidden="true"></i></a>`).join('')}
         </nav>
         <div class="sidebar-footer">
-          <a class="sidebar-user-card sidebar-user-card-link" href="${adminPath('account')}" data-action="navigate" aria-label="فتح إعدادات حساب الأدمن">
+          <div class="sidebar-user-card" role="group" aria-label="بيانات حساب الأدمن">
             <span class="sidebar-user-avatar">${avatarUrl ? `<img src="${escapeHtml(avatarUrl)}" alt="صورة الحساب" loading="lazy" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><i class="fa-solid fa-user" aria-hidden="true" hidden></i>` : '<i class="fa-solid fa-user" aria-hidden="true"></i>'}<b aria-hidden="true"></b></span>
             <span class="sidebar-user-copy"><strong title="${escapeHtml(profile.full_name || state.auth.session?.user?.email || '')}">${escapeHtml(profile.full_name || 'Amwaj Travel Administrator')}</strong><small>مدير النظام</small></span>
             <span class="sidebar-user-menu" aria-hidden="true"><i class="fa-solid fa-ellipsis-vertical"></i></span>
-                    </a>
+          </div>
           <button class="sidebar-signout btn btn-ghost" type="button" data-action="sign-out">
 <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i> تسجيل الخروج</button>
           <button class="sidebar-assistant-card" type="button" data-copilot="toggle" aria-label="فتح مساعد أمواج الإداري">
