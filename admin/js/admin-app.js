@@ -1623,7 +1623,7 @@
     else if (state.page === 'settings') await renderSettings();
     else if (state.page === 'account') await renderAccountPage();
     else await renderDashboard();
-    syncMobileNavState(false);
+    syncMobileNavState(isCompactAdminViewport() ? false : true);
     applyTableAffordances();
     consumeCopilotEditorPrefill();
   }
@@ -1632,8 +1632,8 @@
     const sidebar = document.getElementById('admin-sidebar');
     sidebar?.classList.remove('is-open');
     document.body.classList.remove('admin-nav-open');
-    syncMobileNavState(false);
-    if (restoreFocus) document.querySelector('[data-action="toggle-nav"]')?.focus({ preventScroll: true });
+    syncMobileNavState(isCompactAdminViewport() ? false : true);
+    if (restoreFocus && isCompactAdminViewport()) document.querySelector('[data-action="toggle-nav"]')?.focus({ preventScroll: true });
   }
 
   function toggleMobileNav() {
