@@ -120,7 +120,7 @@
 
   async function updateAvatar(avatarUrl) {
     const cleanUrl = String(avatarUrl || '').trim();
-    if (cleanUrl && !/^https?:\/\//i.test(cleanUrl)) throw new Error('رابط الصورة غير صالح.');
+    if (cleanUrl && !/^(https?:\/\/|\/)/i.test(cleanUrl)) throw new Error('رابط الصورة غير صالح.');
     const session = await getValidSession();
     if (!session?.access_token) throw new Error('انتهت جلسة المدير. سجّل الدخول من جديد.');
     const updatedUser = await authRequest('/user', {

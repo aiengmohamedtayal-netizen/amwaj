@@ -1198,14 +1198,14 @@
     const user = state.auth.session?.user || {};
     const currentAvatar = safeUrl(user.user_metadata?.avatar_url || '');
     const currentName = state.auth.profile?.full_name || user.user_metadata?.full_name || '';
-    const avatarOptions = accountAvatarOptions.map((avatar) => `<button class="avatar-option ${currentAvatar === avatar.url ? 'is-selected' : ''}" type="button" data-action="select-avatar" data-avatar-url="${escapeHtml(avatar.url)}" aria-label="اختيار ${escapeHtml(avatar.label)}" aria-pressed="${String(currentAvatar === avatar.url)}"><span class="avatar-option-image">${accountAvatarMarkup(avatar.url, avatar.label)}</span><span>${escapeHtml(avatar.label)}</span></button>`).join('');
+    const avatarOptions = accountAvatarOptions.map((avatar) => `<button class="avatar-option ${currentAvatar === avatar.url ? 'is-selected' : ''}" type="button" data-action="select-avatar" data-avatar-url="${escapeHtml(avatar.url)}" aria-label="اختيار ${escapeHtml(avatar.label)}" aria-pressed="${String(currentAvatar === avatar.url)}"><span class="avatar-option-image">${accountAvatarMarkup(avatar.url, avatar.label)}</span></button>`).join('');
     const content = `${pageHeader('حساب الأدمن', 'حدّث بيانات حسابك وصورتك الشخصية من مكان واحد، مع الحفاظ على صلاحياتك الحالية.')}
       <div class="account-page">
         <section class="panel account-card account-avatar-card">
           <div class="panel-head"><div><h3 class="panel-title">الصورة الشخصية</h3><p class="panel-subtitle">اختر رسماً جاهزاً بأسلوب بسيط أو ارفع صورة من جهازك.</p></div><i class="fa-solid fa-image account-section-icon" aria-hidden="true"></i></div>
           <div class="account-avatar-editor">
             <div class="avatar-preview" data-account-avatar-preview>${accountAvatarMarkup(currentAvatar, 'صورة الحساب')}</div>
-            <div class="avatar-upload-copy"><strong>صورتك الحالية</strong><span class="muted">تظهر الصورة المختارة أيضاً في بطاقة المستخدم داخل القائمة الجانبية.</span><input id="account-avatar-file" class="sr-only" type="file" accept="image/jpeg,image/png,image/webp,image/avif"><button class="btn btn-primary" type="button" data-action="upload-avatar"><i class="fa-solid fa-cloud-arrow-up" aria-hidden="true"></i> رفع صورة</button></div>
+            <div class="avatar-upload-copy"><strong>صورتك الحالية</strong><span class="muted">تظهر الصورة المختارة أيضاً في بطاقة المستخدم داخل القائمة الجانبية.</span><input id="account-avatar-file" class="sr-only" type="file" accept="image/jpeg,image/png,image/webp,image/avif"><div class="avatar-upload-actions"><button class="btn btn-primary" type="button" data-action="upload-avatar"><i class="fa-solid fa-cloud-arrow-up" aria-hidden="true"></i> رفع صورة</button><button class="btn btn-danger" type="button" data-action="delete-avatar" ${currentAvatar ? '' : 'disabled'}><i class="fa-solid fa-trash-can" aria-hidden="true"></i> حذف الصورة</button></div></div>
           </div>
           <div class="avatar-picker-head"><div><h4>اختر Avatar جاهزاً</h4><p class="muted">يمكنك تغيير الاختيار في أي وقت.</p></div><span class="badge badge-draft">6 خيارات</span></div>
           <div class="avatar-grid" role="list" aria-label="Avatars جاهزة">${avatarOptions}</div>
@@ -1267,6 +1267,19 @@
       await renderAccountPage();
     } catch (error) {
       showToast('error', 'تعذر حفظ الصورة', error.message);
+      setButtonBusy(button, false);
+    }
+  }
+
+  async function deleteAvatar(button) {
+    setButtonBusy(button, true);
+    try {
+      await client.updateAvatar('');
+      state.auth.session = await client.getValidSession();
+      showToast('success', 'تم حذف الصورة', 'تمت إعادة الحساب إلى الأيقونة الافتراضية.');
+      await renderAccountPage();
+    } catch (error) {
+      showToast('error', 'تعذر حذف الصورة', error.message);
       setButtonBusy(button, false);
     }
   }
@@ -1652,6 +1665,7 @@
     if (action === 'change-password') changePassword(target);
     if (action === 'select-avatar') selectAvatar(target);
     if (action === 'upload-avatar') uploadAvatar(target);
+    if (action === 'delete-avatar') deleteAvatar(target);
     if (action === 'new-blog') openBlogEditor(null);
     if (action === 'edit-blog') { const post = (state.blog?.posts || []).find((item) => item.id === target.dataset.id); if (post) openBlogEditor(post); }
     if (action === 'preview-blog') { const post = (state.blog?.posts || []).find((item) => item.id === target.dataset.id); if (post) openBlogPreview(post); }
