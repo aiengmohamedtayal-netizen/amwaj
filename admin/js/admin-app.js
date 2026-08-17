@@ -1734,6 +1734,9 @@
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && document.getElementById('admin-sidebar')?.classList.contains('is-open')) closeMobileNav({ restoreFocus: true });
   });
+  window.addEventListener('amwaj:copilot-opened', () => {
+    if (isCompactAdminViewport()) closeMobileNav();
+  });
   window.addEventListener('resize', () => {
     if (!isCompactAdminViewport()) closeMobileNav();
     else syncMobileNavState(document.getElementById('admin-sidebar')?.classList.contains('is-open'));

@@ -7,6 +7,7 @@
   const MAX_DOCUMENT_BYTES = 5 * 1024 * 1024;
   const MAX_DOCUMENT_TEXT = 24000;
   const state = { open: false, busy: false, language: 'ar', history: [], pendingMutation: null, attachments: [], documentAttachment: null, editorPrefills: new Map(), prefillSequence: 0 };
+  let eventsBound = false;
 
   const routes = Object.freeze({
     '/admin/': 'لوحة التحكم',
@@ -438,6 +439,9 @@
     panel.setAttribute('aria-hidden', String(!state.open));
     toggles.forEach((toggle) => toggle.setAttribute('aria-expanded', String(state.open)));
     document.documentElement.classList.toggle('copilot-open', state.open);
+    if (state.open && window.matchMedia?.('(max-width: 1023px)').matches) {
+      window.dispatchEvent(new CustomEvent('amwaj:copilot-opened'));
+    }
     try { sessionStorage.setItem(storageKey, String(state.open)); } catch { /* no storage required */ }
     if (state.open && focus) window.setTimeout(() => input()?.focus(), 80);
     if (!state.open && focus) toggles[0]?.focus();
@@ -450,10 +454,20 @@
   }
 
   function bindEvents() {
+    if (eventsBound) return;
+    eventsBound = true;
     document.addEventListener('click', (event) => {
       const command = event.target.closest('[data-copilot]')?.dataset.copilot;
-      if (command === 'toggle') setOpen(!state.open);
-      if (command === 'close') setOpen(false);
+      if (command === 'toggle') {
+        event.preventDefault();
+        setOpen(!state.open);
+        return;
+      }
+      if (command === 'close') {
+        event.preventDefault();
+        setOpen(false);
+        return;
+      }
       if (command === 'language') {
         state.language = state.language === 'ar' ? 'en' : 'ar';
         event.target.closest('button').textContent = state.language === 'ar' ? 'ع' : 'EN';
